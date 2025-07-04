@@ -5,13 +5,16 @@ from core.config import settings
 from sqlmodel import SQLModel
 from core.database import auth_engine, system_engine
 from models.usuario_model import UsuarioModel  # Modelos do banco de autenticação
-from models.candidato_model import CandidatoInfosBasicas, CandidatoInformacoesPessoais, CandidatoInformacoesProfissionais, CandidatoFormacaoEIdiomas ,CandidatoCurriculos # Modelos do banco de sistema
+from models.candidato_model import CandidatoInfosBasicas, CandidatoInformacoesPessoais, CandidatoInformacoesProfissionais, CandidatoFormacaoEIdiomas ,CandidatoCurriculos 
+from models.vagas_model import VagaInfosBasicas, VagaPerfil, VagaBeneficios  # Modelos do banco de sistema
+from models.prospect_model import Prospect  # Modelo de prospects
 #from models.vaga_model import VagaModel  # Outros modelos do banco de sistema
 import os
 
 def create_auth_db_and_tables():
     """Cria as tabelas no banco de autenticação."""
     SQLModel.metadata.create_all(auth_engine, tables=[UsuarioModel.__table__])
+    
 
 def create_system_db_and_tables():
     """Cria as tabelas no banco de sistema."""
@@ -21,6 +24,10 @@ def create_system_db_and_tables():
         CandidatoInformacoesProfissionais.__table__,
         CandidatoFormacaoEIdiomas.__table__,
         CandidatoCurriculos.__table__,
+        Prospect.__table__,
+        VagaInfosBasicas.__table__,
+        VagaPerfil.__table__,
+        VagaBeneficios.__table__,
     ])
 
 def get_application() -> FastAPI:

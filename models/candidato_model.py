@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy import Column, Text
-from typing import Optional
+from typing import Optional, List
 
 class CandidatoInfosBasicas(SQLModel, table=True):
     __tablename__ = "candidato_infos_basicas"
@@ -21,6 +21,7 @@ class CandidatoInfosBasicas(SQLModel, table=True):
     informacoes_profissionais: Optional["CandidatoInformacoesProfissionais"] = Relationship(back_populates="infos_basicas")
     formacao_e_idiomas: Optional["CandidatoFormacaoEIdiomas"] = Relationship(back_populates="infos_basicas")
     curriculos: Optional["CandidatoCurriculos"] = Relationship(back_populates="infos_basicas")
+    prospects: List["Prospect"] = Relationship(back_populates="candidato")  # Relacionamento com Prospect
 
 
 class CandidatoInformacoesPessoais(SQLModel, table=True):

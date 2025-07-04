@@ -2,6 +2,7 @@ from sqlmodel import SQLModel
 from core.database import system_engine  # Certifique-se de importar seu engine
 from models.candidato_model import CandidatoInfosBasicas, CandidatoInformacoesPessoais, CandidatoInformacoesProfissionais, CandidatoFormacaoEIdiomas, CandidatoCurriculos
 from models.vagas_model import VagaInfosBasicas, VagaPerfil, VagaBeneficios
+from models.prospect_model import Prospect
 
 def recreate_tables():
     # Apagar todas as tabelas (Atenção: isso removerá todos os dados)

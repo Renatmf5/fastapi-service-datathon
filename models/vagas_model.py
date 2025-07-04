@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy import Column, Text
-from typing import Optional
+from typing import List, Optional
+
 
 class VagaInfosBasicas(SQLModel, table=True):
     __tablename__ = "vaga_infos_basicas"
@@ -26,6 +27,7 @@ class VagaInfosBasicas(SQLModel, table=True):
 
     perfil_vaga: Optional["VagaPerfil"] = Relationship(back_populates="infos_basicas", sa_relationship_kwargs={"uselist": False})
     beneficios: Optional["VagaBeneficios"] = Relationship(back_populates="infos_basicas", sa_relationship_kwargs={"uselist": False})
+    prospects: List["Prospect"] = Relationship(back_populates="vaga")  # Adicionado o relacionamento
 
 
 class VagaPerfil(SQLModel, table=True):

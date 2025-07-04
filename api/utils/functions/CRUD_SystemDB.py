@@ -1,7 +1,9 @@
 from sqlmodel import Session, select, delete
 from models.candidato_model import CandidatoInfosBasicas, CandidatoInformacoesPessoais, CandidatoInformacoesProfissionais, CandidatoFormacaoEIdiomas, CandidatoCurriculos
 from models.vagas_model import VagaInfosBasicas, VagaPerfil, VagaBeneficios
+from models.prospect_model import Prospect
 from sqlalchemy import func
+from datetime import datetime
 
 import json
 import os
@@ -291,3 +293,154 @@ def listar_detalhes_vaga_por_codigo(codigo_vaga: str, db: Session):
     }
     
     return vaga_detalhes
+
+def atualizar_tabelas_prospects(json_file_path: str, db: Session):
+    """
+    Atualiza as tabelas de prospects no banco de dados com base em um arquivo JSON.
+    Apaga todos os dados existentes e insere os novos dados.
+
+    O JSON deve ser um dicionário onde cada chave é o código da vaga, e o valor contém
+    as informações da vaga e uma lista de prospects associados.
+
+    :param json_file_path: Caminho para o arquivo JSON.
+    :param db: Sessão do banco de dados.
+    """
+    # Remover os registros existentes
+    db.exec(delete(Prospect))
+    db.commit()
+
+    # Ler o arquivo JSON
+    with open(json_file_path, "r", encoding="utf-8") as file:
+        prospects_data = json.load(file)
+
+    # Processar cada vaga e seus prospects
+    for codigo_vaga_str, vaga_data in prospects_data.items():
+        codigo_vaga = int(codigo_vaga_str)
+
+        # Processar cada prospect associado à vaga
+        for prospect_data in vaga_data.get("prospects", []):
+            # Criar o objeto Prospect
+            prospect = Prospect(
+                codigo_vaga=codigo_vaga,
+                titulo_vaga=vaga_data["titulo"],
+                nome=prospect_data["nome"],
+                codigo_candidato=int(prospect_data["codigo"]),
+                situacao_candidato=prospect_data["situacao_candidado"],
+                data_candidatura=prospect_data["data_candidatura"],
+                ultima_atualizacao=prospect_data["ultima_atualizacao"],
+                comentario=prospect_data.get("comentario", None),
+                recrutador=prospect_data["recrutador"]
+            )
+            db.add(prospect)
+
+    db.commit()
+    
+    
+def listar_prospects(db: Session, offset: int = 0, limit: int = 100):
+    """
+    Lista todos os prospects com paginação.
+    
+    :param db: Sessão do banco de dados.
+    :param offset: Posição inicial para a paginação.
+    :param limit: Número máximo de registros a serem retornados.
+    :return: Lista de prospects.
+    """
+    stmt = select(Prospect).offset(offset).limit(limit)
+    prospects = db.exec(stmt).all()
+    return prospects
+
+def add_candidate_to_prospect(data: dict, db: Session):
+    """
+    Adiciona um candidato a um prospect. 
+    Se não existir nenhum prospect para a vaga, cria um novo registro com os dados.
+    Se já existir um prospect com a mesma combinação de codigo_vaga e codigo_candidato, lança exceção.
+    Espera-se que o dicionário 'data' contenha:
+      - codigo_vaga
+      - titulo_vaga
+      - nome
+      - codigo_candidato
+      - situacao_candidato
+      - data_candidatura
+      - comentario (opcional)
+      - recrutador
+    """
+    # Converte código_candidato se for string
+    codigo_candidato = int(data["codigo_candidato"])
+    stmt = select(Prospect).where(
+        Prospect.codigo_vaga == data["codigo_vaga"],
+        Prospect.codigo_candidato == codigo_candidato
+    )
+    prospect_existente = db.exec(stmt).first()
+    if prospect_existente:
+        raise Exception("O candidato já está associado a esta vaga.")
+    
+    novo_prospect = Prospect(
+        codigo_vaga = data["codigo_vaga"],
+        titulo_vaga = data["titulo_vaga"],
+        nome = data["nome"],
+        codigo_candidato = codigo_candidato,
+        situacao_candidato = data["situacao_candidato"],
+        data_candidatura = data["data_candidatura"],
+        ultima_atualizacao = datetime.now().strftime("%d-%m-%Y"),
+        comentario = data.get("comentario", ""),
+        recrutador = data["recrutador"]
+    )
+    db.add(novo_prospect)
+    db.commit()
+    db.refresh(novo_prospect)
+    return novo_prospect
+
+def update_candidate_in_prospect(data: dict, db: Session):
+    """
+    Atualiza um candidato dentro de um prospect.
+    O payload deve conter codigo_vaga, codigo_candidato, e os campos a atualizar (por ex. situacao_candidato, comentario).
+    Atualiza a 'ultima_atualizacao' para a data atual.
+    """
+    codigo_candidato = int(data["codigo_candidato"])
+    stmt = select(Prospect).where(
+        Prospect.codigo_vaga == data["codigo_vaga"],
+        Prospect.codigo_candidato == codigo_candidato
+    )
+    prospect_existente = db.exec(stmt).first()
+    if not prospect_existente:
+        raise Exception("Prospect não encontrado para os códigos informados.")
+    
+    if "situacao_candidato" in data and data["situacao_candidato"]:
+        prospect_existente.situacao_candidato = data["situacao_candidato"]
+    if "comentario" in data:
+        prospect_existente.comentario = data["comentario"]
+    
+    prospect_existente.ultima_atualizacao = datetime.now().strftime("%d-%m-%Y")
+    db.add(prospect_existente)
+    db.commit()
+    db.refresh(prospect_existente)
+    return prospect_existente
+
+def listar_prospects_group(db: Session, offset: int = 0, limit: int = 100):
+    """
+    Retorna os prospects agrupados por codigo_vaga, aplicando paginação nos grupos.
+    Para cada grupo (vaga), busca os prospects associados.
+    """
+    # Consulta para obter os grupos distintos (chave e título da vaga, por exemplo)
+    stmt_groups = (
+        select(Prospect.codigo_vaga, Prospect.titulo_vaga)
+        .group_by(Prospect.codigo_vaga, Prospect.titulo_vaga)
+        .order_by(Prospect.codigo_vaga)
+        .offset(offset)
+        .limit(limit)
+    )
+    grupos = db.exec(stmt_groups).all()
+    
+    result = []
+    for grupo in grupos:
+        codigo_vaga, titulo_vaga = grupo
+        # Consulta para obter os prospects da vaga
+        stmt_prospects = select(Prospect).where(Prospect.codigo_vaga == codigo_vaga)
+        prospects = db.exec(stmt_prospects).all()
+        result.append({
+            "codigo_vaga": codigo_vaga,
+            "titulo_vaga": titulo_vaga,
+            "modalidade": "",  # Caso tenha, insira a informação ou deixe vazio
+            "prospects": prospects
+        })
+    return result

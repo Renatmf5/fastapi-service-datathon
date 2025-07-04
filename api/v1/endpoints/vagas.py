@@ -4,8 +4,7 @@ from core.database import get_system_session
 from api.utils.functions.CRUD_SystemDB import (
     salvar_vaga,
     listar_vagas,
-    listar_detalhes_vaga_por_codigo,
-    atualizar_tabelas_vagas
+    listar_detalhes_vaga_por_codigo
 )
 from core.services.fetch_S3_files import read_vagas_json_from_s3 
 
@@ -35,7 +34,7 @@ def detalhes_vaga(codigo_vaga: str, db: Session = Depends(get_system_session)):
         vaga_detalhes = listar_detalhes_vaga_por_codigo(codigo_vaga, db)
         if not vaga_detalhes:
             raise HTTPException(status_code=404, detail="Vaga não encontrada.")
-        return vaga_detalhes
+        return {"data": vaga_detalhes}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
