@@ -62,6 +62,7 @@ async def listar_grouped(offset: int = 0, limit: int = 100, db: Session = Depend
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/update-tables", summary="Atualizar Tabelas de Prospects")
 async def atualizar_tabelas(data: dict, db: Session = Depends(get_system_session)):
     try:
