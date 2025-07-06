@@ -1,6 +1,11 @@
+import os
+import json
+import boto3
+from collections import OrderedDict
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from core.database import get_system_session
+from core.config import settings
 from api.utils.functions.CRUD_SystemDB import listar_prospects, add_candidate_to_prospect, update_candidate_in_prospect, listar_prospects_group
 from core.services.fetch_S3_files import read_prospects_json_from_s3
 from pydantic import BaseModel
@@ -74,3 +79,50 @@ async def atualizar_tabelas(data: dict, db: Session = Depends(get_system_session
         return response
     except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))    
+    
+@router.post("/export-prospects", summary="Exportar prospects para JSON e enviar para o S3")
+async def export_prospects(db: Session = Depends(get_system_session)):
+    try:
+        # Recupera todos os grupos de prospects (definindo um limite alto para pegar todos)
+        grupos = listar_prospects_group(db, offset=0, limit=10)
+        
+        # Cria o dicionário com a estrutura desejada
+        export_data = {}
+        for grupo in grupos:
+            codigo_vaga = str(grupo.get("codigo_vaga", ""))
+            titulo = grupo.get("titulo_vaga") or ""
+            modalidade = grupo.get("modalidade") or ""
+            prospects_list = []
+            for prospect in grupo.get("prospects", []):
+                # Converte o prospect para dicionário se possuir o método model_dump()
+                prospect_dict = prospect.model_dump() if hasattr(prospect, "model_dump") else prospect
+                prospects_list.append({
+                    "nome": prospect_dict.get("nome", ""),
+                    "codigo": str(prospect_dict.get("codigo_candidato", "")),
+                    "situacao_candidado": prospect_dict.get("situacao_candidato", ""),
+                    "data_candidatura": prospect_dict.get("data_candidatura", ""),
+                    "ultima_atualizacao": prospect_dict.get("ultima_atualizacao", ""),
+                    "comentario": prospect_dict.get("comentario", ""),
+                    "recrutador": prospect_dict.get("recrutador", "")
+                })
+            export_data[codigo_vaga] = {
+                "titulo": titulo,
+                "modalidade": modalidade,
+                "prospects": prospects_list
+            }
+        
+        # Converte o dicionário para JSON formatado
+        json_output = json.dumps(export_data, ensure_ascii=False, indent=2)
+        
+        # Faz o upload para o S3
+        s3_client = boto3.client("s3")
+        file_key = f"raw/prospects.json"
+        s3_client.put_object(
+            Bucket=settings.BUCKET_NAME,
+            Key=file_key,
+            Body=json_output.encode("utf-8")
+        )
+
+        return {"message": "Exportação de prospects realizada com sucesso.", "file_key": file_key}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

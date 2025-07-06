@@ -67,12 +67,13 @@ def read_applicants_json_from_s3(file_key: str) -> DataResponse:
                 return {"message": "Arquivo em cache está atualizado. recarregando banco."}
 
         # Caso contrário, baixe o arquivo do S3 e atualize o cache
-        s3_path = f"s3://{bucket_name}/raw/{file_key}.json"
-        df = pd.read_json(s3_path)
+        response = s3_client.get_object(Bucket=bucket_name, Key=f"raw/{file_key}.json")
+        file_content = response["Body"].read().decode("utf-8")
 
         # Salvar o arquivo localmente
-        df.to_json(local_file_path, orient="records")
-        
+        with open(local_file_path, "w") as local_file:
+            local_file.write(file_content)
+
         # Atualizar metadados do cache
         s3_last_modified = get_s3_file_last_modified(key=f"raw/{file_key}.json")
         with open(cache_metadata_path, "w") as meta_file:
@@ -88,7 +89,7 @@ def read_applicants_json_from_s3(file_key: str) -> DataResponse:
         raise HTTPException(status_code=500, detail=str(e))
     
 
-def read_vagas_json_from_s3(file_key: str) -> DataResponse:
+def read_vagas_json_from_s3(file_key: str) -> dict:
     try:
         # Caminho do arquivo em cache
         local_file_path = os.path.join(cache_dir, f"{file_key}.json")
@@ -98,28 +99,27 @@ def read_vagas_json_from_s3(file_key: str) -> DataResponse:
         if os.path.exists(local_file_path) and os.path.exists(cache_metadata_path):
             with open(cache_metadata_path, "r") as meta_file:
                 cached_last_modified = datetime.fromisoformat(meta_file.read().strip())
-            
             s3_last_modified = get_s3_file_last_modified(key=f"raw/{file_key}.json")
-            
-            # Se o arquivo em cache estiver atualizado, não há necessidade de atualizar o banco
+            # Se o arquivo em cache estiver atualizado, atualizar as tabelas e retornar
             if cached_last_modified >= s3_last_modified:
                 with Session(system_engine) as db:
                     atualizar_tabelas_vagas(local_file_path, db)
-                return {"message": "Arquivo em cache está atualizado. recarregando banco."}
+                return {"message": "Arquivo em cache está atualizado. Recarregando banco."}
 
-        # Caso contrário, baixe o arquivo do S3 e atualize o cache
-        s3_path = f"s3://{bucket_name}/raw/{file_key}.json"
-        df = pd.read_json(s3_path)
+        # Caso contrário, baixe o arquivo do S3 sem conversão (preservando o formato original)
+        response = s3_client.get_object(Bucket=bucket_name, Key=f"raw/{file_key}.json")
+        file_content = response["Body"].read().decode("utf-8")
 
-        # Salvar o arquivo localmente
-        df.to_json(local_file_path, orient="records")
+        # Salvar o conteúdo diretamente no arquivo local
+        with open(local_file_path, "w", encoding="utf-8") as f:
+            f.write(file_content)
         
         # Atualizar metadados do cache
         s3_last_modified = get_s3_file_last_modified(key=f"raw/{file_key}.json")
         with open(cache_metadata_path, "w") as meta_file:
             meta_file.write(s3_last_modified.isoformat())
 
-        # Atualizar as tabelas de vagas no banco de dados criando uma nova sessão
+        # Atualizar as tabelas de vagas no banco de dados
         with Session(system_engine) as db:
             atualizar_tabelas_vagas(local_file_path, db)
 
@@ -127,8 +127,9 @@ def read_vagas_json_from_s3(file_key: str) -> DataResponse:
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 
-def read_prospects_json_from_s3(file_key: str) -> DataResponse:
+def read_prospects_json_from_s3(file_key: str) -> dict:
     try:
         # Caminho do arquivo em cache
         local_file_path = os.path.join(cache_dir, f"{file_key}.json")
@@ -138,28 +139,27 @@ def read_prospects_json_from_s3(file_key: str) -> DataResponse:
         if os.path.exists(local_file_path) and os.path.exists(cache_metadata_path):
             with open(cache_metadata_path, "r") as meta_file:
                 cached_last_modified = datetime.fromisoformat(meta_file.read().strip())
-            
             s3_last_modified = get_s3_file_last_modified(key=f"raw/{file_key}.json")
-            
-            # Se o arquivo em cache estiver atualizado, não há necessidade de atualizar o banco
+            # Se o arquivo em cache estiver atualizado, atualizar as tabelas e retornar
             if cached_last_modified >= s3_last_modified:
                 with Session(system_engine) as db:
                     atualizar_tabelas_prospects(local_file_path, db)
-                return {"message": "Arquivo em cache está atualizado. recarregando banco."}
+                return {"message": "Arquivo em cache está atualizado. Recarregando banco."}
 
-        # Caso contrário, baixe o arquivo do S3 e atualize o cache
-        s3_path = f"s3://{bucket_name}/raw/{file_key}.json"
-        df = pd.read_json(s3_path)
+        # Caso contrário, baixe o arquivo do S3 sem conversão (preservando o formato original)
+        response = s3_client.get_object(Bucket=bucket_name, Key=f"raw/{file_key}.json")
+        file_content = response["Body"].read().decode("utf-8")
 
-        # Salvar o arquivo localmente
-        df.to_json(local_file_path, orient="records")
+        # Salvar o conteúdo diretamente no arquivo local
+        with open(local_file_path, "w", encoding="utf-8") as f:
+            f.write(file_content)
         
         # Atualizar metadados do cache
         s3_last_modified = get_s3_file_last_modified(key=f"raw/{file_key}.json")
         with open(cache_metadata_path, "w") as meta_file:
             meta_file.write(s3_last_modified.isoformat())
 
-        # Atualizar as tabelas de prospects no banco de dados criando uma nova sessão
+        # Atualizar as tabelas de prospects no banco de dados
         with Session(system_engine) as db:
             atualizar_tabelas_prospects(local_file_path, db)
 
