@@ -60,6 +60,6 @@ if __name__ == "__main__":
     env = settings.ENV
     print(f"Running in {env} mode")
     if env == "production":
-        uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level=settings.LOG_LEVEL)
+        uvicorn.run("main:app", host="0.0.0.0", port=80, log_level=settings.LOG_LEVEL)
     else:
         uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level=settings.LOG_LEVEL, reload=True)
