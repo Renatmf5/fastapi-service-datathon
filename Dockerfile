@@ -1,12 +1,13 @@
 FROM python:3.10-slim
 
 
-# Instalar gcc e as dependências de compilação
+# Instalar gcc e curl as dependências de compilação
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
-    
+
 # Cria o diretório de trabalho
 WORKDIR /app
 
