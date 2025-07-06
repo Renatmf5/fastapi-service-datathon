@@ -15,7 +15,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Definie variavel de ambiente ENV
-ENV ENV="Production"
+ENV ENV="production"
 
 # Copia todo o código para o container
 COPY . .
