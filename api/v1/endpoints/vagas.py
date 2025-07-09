@@ -10,7 +10,8 @@ from api.utils.functions.CRUD_SystemDB import (
     listar_vagas,
     listar_detalhes_vaga_por_codigo
 )
-from core.services.fetch_S3_files import read_vagas_json_from_s3 
+from core.services.fetch_S3_files import read_vagas_json_from_s3
+from fastapi import BackgroundTasks 
 
 router = APIRouter()
 
@@ -44,16 +45,19 @@ def detalhes_vaga(codigo_vaga: str, db: Session = Depends(get_system_session)):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Erro ao buscar detalhes da vaga.")
 
+
+
 @router.post("/update-tables", summary="Atualizar Tabelas de Vagas")
-def atualizar_tabelas_vagas_endpoint(data: dict, db: Session = Depends(get_system_session)):
+def atualizar_tabelas_vagas_endpoint(data: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_system_session)):
     try:
         file_key = data.get("file_key")
         if not file_key:
             raise HTTPException(status_code=400, detail="O campo 'file_key' é obrigatório.")
-
-        response = read_vagas_json_from_s3(file_key)
         
-        return response
+        # Adiciona a tarefa em background para ler o JSON e atualizar o BD
+        background_tasks.add_task(read_vagas_json_from_s3, file_key)
+        
+        return {"message": "Tarefa de atualização iniciada em background."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
