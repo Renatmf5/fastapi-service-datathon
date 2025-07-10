@@ -208,65 +208,77 @@ def busca_modelo_pkl_classificacao():
 
 def busca_modelo_recomendacao():
     """
-    Baixa e retorna os caminhos locais dos arquivos necessários para o modelo de recomendação.
-    São 3 arquivos:
-      - annoy_index.ann
-      - candidate_embeddings.npy
-      - job_embeddings.npy
-    
-    O arquivo latest.txt, contido em models/Modelo_Recomendacao_Vagas/, possui 3 linhas,
-    onde cada linha é o caminho relativo (como "v10/annoy_index.ann") para cada arquivo.
-    A função baixa (ou utiliza o cache, se atualizado) cada arquivo e retorna um dicionário
-    com as chaves:
-      - "annoy_index_path"
-      - "candidate_embeddings_path"
-      - "job_embeddings_path"
+    Baixa os arquivos necessários para recomendação, forçando a atualização se o cache estiver desatualizado.
+    Em latest.txt, são esperadas linhas referentes a candidate embeddings, job embeddings e annoy index.
+    A ordem será determinada dinamicamente, filtrando por palavras-chave.
     """
     try:
         model_key_prefix = "models/Modelo_Recomendacao_Vagas/"
         latest_txt_key = f"{model_key_prefix}latest.txt"
+        os.makedirs(cache_dir, exist_ok=True)
         
-        # Baixar o arquivo latest.txt
         response = s3_client.get_object(Bucket=bucket_name, Key=latest_txt_key)
         latest_content = response["Body"].read().decode("utf-8").strip()
         lines = latest_content.splitlines()
         if len(lines) < 3:
-            raise Exception("latest.txt deve conter 3 linhas para os 3 arquivos.")
+            raise Exception("latest.txt deve conter pelo menos 3 linhas correspondentes aos arquivos necessários.")
+        
+        # Inicializa as variáveis
+        candidate_embeddings_relative = None
+        job_embeddings_relative = None
+        annoy_relative = None
+        
+        # Itera pelas linhas buscando palavras-chave (não case sensitive)
+        for line in lines:
+            lower_line = line.lower().strip()
+            if "candidate" in lower_line:
+                candidate_embeddings_relative = line.strip()
+            elif "job" in lower_line:
+                job_embeddings_relative = line.strip()
+            elif "annoy" in lower_line:
+                annoy_relative = line.strip()
+                
+        # Verifica se encontrou as três referências necessárias
+        if not (candidate_embeddings_relative and job_embeddings_relative and annoy_relative):
+            raise Exception("Não foi possível identificar todas as linhas necessárias em latest.txt. "
+                            "Verifique se as linhas contêm as palavras-chave 'candidate', 'job' e 'annoy'.")
         
         # Monta as keys completas para cada arquivo
-        annoy_relative = lines[0].strip()
-        candidate_embeddings_relative = lines[1].strip()
-        job_embeddings_relative = lines[2].strip()
-        
-        annoy_key = f"{model_key_prefix}{annoy_relative}"
         candidate_embeddings_key = f"{model_key_prefix}{candidate_embeddings_relative}"
         job_embeddings_key = f"{model_key_prefix}{job_embeddings_relative}"
+        annoy_key = f"{model_key_prefix}{annoy_relative}"
         
-        # Define os caminhos locais e os caminhos dos metadados
-        local_annoy = os.path.join(cache_dir, "annoy_index.ann")
+        # Define os caminhos locais para salvar os arquivos
         local_candidate = os.path.join(cache_dir, "candidate_embeddings.npy")
         local_job = os.path.join(cache_dir, "job_embeddings.npy")
+        local_annoy = os.path.join(cache_dir, "annoy_index.ann")
         
-        cache_annoy_metadata = os.path.join(cache_dir, "annoy_index_metadata.txt")
         cache_candidate_metadata = os.path.join(cache_dir, "candidate_embeddings_metadata.txt")
         cache_job_metadata = os.path.join(cache_dir, "job_embeddings_metadata.txt")
+        cache_annoy_metadata = os.path.join(cache_dir, "annoy_index_metadata.txt")
         
-        # Função auxiliar para verificar e baixar o arquivo se necessário
         def update_file(file_key: str, local_path: str, metadata_path: str):
             download_required = True
             if os.path.exists(local_path) and os.path.exists(metadata_path):
-                with open(metadata_path, "r") as meta_file:
-                    cached_last_modified = datetime.fromisoformat(meta_file.read().strip())
-                s3_last_modified = get_s3_file_last_modified(file_key)
-                if cached_last_modified >= s3_last_modified:
-                    download_required = False
+                try:
+                    with open(metadata_path, "r") as meta_file:
+                        cached_last_modified = datetime.fromisoformat(meta_file.read().strip())
+                    s3_last_modified = get_s3_file_last_modified(file_key)
+                    if cached_last_modified >= s3_last_modified:
+                        print(f"Cache HIT para {os.path.basename(local_path)}. Usando arquivo local.")
+                        download_required = False
+                except Exception as e:
+                    print(f"Erro ao ler metadados de {os.path.basename(local_path)}: {e}. Forçando download.")
+                    download_required = True
             if download_required:
-                s3_client.download_file(Bucket=bucket_name, Key=file_key, Filename=local_path)
+                print(f"Cache MISS para {os.path.basename(local_path)}. Baixando de {file_key}...")
+                with open(local_path, "wb") as f:
+                    s3_client.download_fileobj(Bucket=bucket_name, Key=file_key, Fileobj=f)
                 s3_last_modified = get_s3_file_last_modified(file_key)
                 with open(metadata_path, "w") as meta_file:
                     meta_file.write(s3_last_modified.isoformat())
+                print(f"Download de {os.path.basename(local_path)} concluído.")
         
-        # Atualiza (ou mantém) os três arquivos
         update_file(annoy_key, local_annoy, cache_annoy_metadata)
         update_file(candidate_embeddings_key, local_candidate, cache_candidate_metadata)
         update_file(job_embeddings_key, local_job, cache_job_metadata)
@@ -278,7 +290,9 @@ def busca_modelo_recomendacao():
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"ERRO CRÍTICO em busca_modelo_recomendacao: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar modelo de recomendação: {e}")
+
 
 def busca_recommendation_pairs() -> str:
     """
