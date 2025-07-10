@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from core.database import get_system_session
 from core.config import settings
-from api.utils.functions.CRUD_SystemDB import salvar_candidato, listar_candidatos, listar_detalhes_candidato_por_codigo
+from api.utils.functions.CRUD_SystemDB import salvar_candidato, listar_candidatos, listar_detalhes_candidato_por_codigo, listar_candidatos_eager
 from core.services.fetch_S3_files import read_applicants_json_from_s3
 from fastapi import BackgroundTasks
 
@@ -59,8 +59,102 @@ def atualizar_tabelas(data: dict, background_tasks: BackgroundTasks, db: Session
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.post("/export-applicants", summary="Exportar Candidatos para S3")
-def export_applicants(db: Session = Depends(get_system_session)):
+def clean_dict(data):
+    """
+    Limpa recursivamente o dicionário removendo as chaves "id" e "codigo_profissional".
+    Se o valor for um dicionário ou uma lista de dicionários, a função é aplicada recursivamente.
+    """
+    if isinstance(data, dict):
+        return {
+            key: clean_dict(value)
+            for key, value in data.items()
+            if key not in ["id", "codigo_profissional"]
+        }
+    elif isinstance(data, list):
+        return [clean_dict(item) for item in data]
+    else:
+        return data
+    
+def do_export_applicants(db: Session):
+    try:
+        chunk_size = 1000  # ajusta conforme necessário
+        offset = 0
+        export_data = OrderedDict()
+
+        while True:
+            candidatos = listar_candidatos_eager(db, offset=offset, limit=chunk_size)
+            if not candidatos:
+                break
+
+            for cand in candidatos:
+                codigo = str(cand.codigo_profissional)
+                ordered_entry = OrderedDict()
+
+                # Dados básicos: todos os atributos do candidato, exceto os relacionamentos
+                ordered_entry["infos_basicas"] = cand.model_dump(
+                    exclude={
+                        "informacoes_pessoais", 
+                        "informacoes_profissionais", 
+                        "formacao_e_idiomas", 
+                        "curriculos", 
+                        "cargo_atual", 
+                        "prospects"
+                    }
+                )
+                
+                # Informações pessoais – se não existir, retorna dicionário vazio
+                if hasattr(cand, "informacoes_pessoais") and cand.informacoes_pessoais is not None:
+                    dados = cand.informacoes_pessoais.model_dump()
+                    ordered_entry["informacoes_pessoais"] = clean_dict(dados)
+                else:
+                    ordered_entry["informacoes_pessoais"] = {}
+
+                # Informações profissionais
+                if hasattr(cand, "informacoes_profissionais") and cand.informacoes_profissionais is not None:
+                    dados = cand.informacoes_profissionais.model_dump()
+                    ordered_entry["informacoes_profissionais"] = clean_dict(dados)
+                else:
+                    ordered_entry["informacoes_profissionais"] = {}
+
+                # Formação e idiomas
+                if hasattr(cand, "formacao_e_idiomas") and cand.formacao_e_idiomas is not None:
+                    dados = cand.formacao_e_idiomas.model_dump()
+                    ordered_entry["formacao_e_idiomas"] = clean_dict(dados)
+                else:
+                    ordered_entry["formacao_e_idiomas"] = {}
+
+                # Cargo atual: se não existir, retorna sempre dicionário vazio
+                if hasattr(cand, "cargo_atual") and cand.cargo_atual is not None:
+                    ordered_entry["cargo_atual"] = cand.cargo_atual.model_dump()
+                else:
+                    ordered_entry["cargo_atual"] = {}
+
+                # Currículos – extraindo cv_pt e cv_en
+                if hasattr(cand, "curriculos") and cand.curriculos is not None:
+                    curriculos = cand.curriculos.model_dump() if hasattr(cand.curriculos, "model_dump") else cand.curriculos
+                    ordered_entry["cv_pt"] = curriculos.get("cv_pt", "")
+                    ordered_entry["cv_en"] = curriculos.get("cv_en", "")
+                else:
+                    ordered_entry["cv_pt"] = ""
+                    ordered_entry["cv_en"] = ""
+
+                export_data[codigo] = ordered_entry
+
+            offset += chunk_size
+
+        json_payload = json.dumps(export_data, ensure_ascii=False, indent=4)
+        s3_client = boto3.client("s3")
+        key = "raw/applicants.json"
+        s3_client.put_object(
+            Bucket=settings.BUCKET_NAME,
+            Key=key,
+            Body=json_payload.encode("utf-8")
+        )
+    except Exception as e:
+        print(f"Erro na exportação de candidatos: {str(e)}")
+
+@router.post("/export-applicants", summary="Exportar Candidatos para S3 (Background)")
+def export_applicants(background_tasks: BackgroundTasks, db: Session = Depends(get_system_session)):
     """
     Consulta toda a base de candidatos, monta um JSON no formato necessário e faz o upload 
     do arquivo no bucket S3 na chave "raw/applicants.json". 
@@ -77,49 +171,5 @@ def export_applicants(db: Session = Depends(get_system_session)):
       }
     }
     """
-    try:
-        # Aqui definimos um limite grande; ajuste conforme o volume esperado
-        candidatos = listar_candidatos(db, offset=0, limit=10)
-        export_data = OrderedDict()
-
-        def clean_dict(data: dict) -> dict:
-            # Remove os campos 'id' e 'codigo_profissional'
-            return {k: v for k, v in data.items() if k not in ["id", "codigo_profissional"]}
-
-        # Para cada candidato, montar o JSON com a estrutura exata desejada
-        for cand in candidatos:
-            codigo = str(cand.codigo_profissional)
-            detalhes = listar_detalhes_candidato_por_codigo(codigo, db)
-            if not detalhes:
-                continue
-
-            # Garantir que 'cargo_atual' exista
-            detalhes["cargo_atual"] = detalhes.get("cargo_atual", {})
-
-            # Montar a estrutura ordenada conforme o exemplo
-            ordered_entry = OrderedDict()
-            ordered_entry["infos_basicas"] = detalhes.get("infos_basicas", {})
-            ordered_entry["informacoes_pessoais"] = clean_dict(detalhes.get("informacoes_pessoais", {}))
-            ordered_entry["informacoes_profissionais"] = clean_dict(detalhes.get("informacoes_profissionais", {}))
-            ordered_entry["formacao_e_idiomas"] = clean_dict(detalhes.get("formacao_e_idiomas", {}))
-            ordered_entry["cargo_atual"] = detalhes.get("cargo_atual", {})
-
-            # Extrair e achatar 'curriculos'
-            curriculos = detalhes.get("curriculos", {})
-            ordered_entry["cv_pt"] = curriculos.get("cv_pt", "")
-            ordered_entry["cv_en"] = curriculos.get("cv_en", "")
-
-            export_data[codigo] = ordered_entry
-
-        json_payload = json.dumps(export_data, ensure_ascii=False, indent=2)
-        # Realiza o upload do JSON para o bucket S3 na pasta "raw"
-        s3_client = boto3.client("s3")
-        key = "raw/applicants.json"
-        s3_client.put_object(
-            Bucket=settings.BUCKET_NAME,
-            Key=key,
-            Body=json_payload.encode("utf-8")
-        )
-        return {"message": "Exportação realizada com sucesso."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    background_tasks.add_task(do_export_applicants, db)
+    return {"message": "Tarefa de exportação de candidatos iniciada em background."}

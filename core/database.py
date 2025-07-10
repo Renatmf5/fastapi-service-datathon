@@ -1,6 +1,7 @@
 from sqlmodel import create_engine, Session
 
 from core.config import settings
+from typing import Generator
 
 auth_engine = create_engine(settings.DATABASE_URL, echo=True)
 
@@ -12,6 +13,6 @@ def get_auth_session():
         yield session
 
 # Sessão para o banco de sistema
-def get_system_session():
+def get_system_session() -> Generator[Session, None, None]:
     with Session(system_engine) as session:
         yield session

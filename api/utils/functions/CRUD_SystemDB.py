@@ -1,4 +1,5 @@
 from sqlmodel import Session, select, delete
+from sqlalchemy.orm import selectinload
 from models.candidato_model import CandidatoInfosBasicas, CandidatoInformacoesPessoais, CandidatoInformacoesProfissionais, CandidatoFormacaoEIdiomas, CandidatoCurriculos
 from models.vagas_model import VagaInfosBasicas, VagaPerfil, VagaBeneficios
 from models.prospect_model import Prospect
@@ -124,10 +125,28 @@ def atualizar_tabelas_candidatos(json_file_path: str, db: Session):
 
     db.commit()
 
-def listar_candidatos(db: Session, offset: int = 0, limit: int = 100):
-    stmt = select(CandidatoInfosBasicas).offset(offset).limit(limit)
+def listar_candidatos(db: Session, offset: int = 0, limit: int = None):
+    stmt = select(CandidatoInfosBasicas).offset(offset)
+    if limit is not None:
+        stmt = stmt.limit(limit)
     candidatos = db.exec(stmt).all()
     return candidatos
+
+def listar_candidatos_eager(db: Session, offset: int = 0, limit: int = None):
+    stmt = (
+        select(CandidatoInfosBasicas)
+        .options(
+            selectinload(CandidatoInfosBasicas.informacoes_pessoais),
+            selectinload(CandidatoInfosBasicas.informacoes_profissionais),
+            selectinload(CandidatoInfosBasicas.formacao_e_idiomas),
+            selectinload(CandidatoInfosBasicas.curriculos),
+            selectinload(CandidatoInfosBasicas.prospects)
+        )
+        .offset(offset)
+    )
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    return db.exec(stmt).all()
 
 def listar_detalhes_candidato_por_codigo(codigo_profissional: str, db: Session):
     """
@@ -261,11 +280,30 @@ def atualizar_tabelas_vagas(json_file_path: str, db: Session):
     db.commit()
 
 # Função para listar vagas com paginação (ex.: 100 por página)
-def listar_vagas(db: Session, offset: int = 0, limit: int = 100):
-    stmt = select(VagaInfosBasicas).offset(offset).limit(limit)
+def listar_vagas(db: Session, offset: int = 0, limit: int = None):
+    stmt = select(VagaInfosBasicas).offset(offset)
+    if limit is not None:
+        stmt = stmt.limit(limit)
     vagas = db.exec(stmt).all()
     return vagas
 
+def listar_vagas_eager(db: Session, offset: int = 0, limit: int = None):
+    """
+    Lista as vagas com carregamento ansioso (eager loading) das tabelas relacionadas.
+    
+    """
+    stmt = (
+        select(VagaInfosBasicas)
+        .options(
+            selectinload(VagaInfosBasicas.perfil_vaga),
+            selectinload(VagaInfosBasicas.beneficios)
+        )
+        .offset(offset)
+    )
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    
+    return db.exec(stmt).all()  
 # Função para retornar os detalhes completos de uma vaga pelo código gerado
 def listar_detalhes_vaga_por_codigo(codigo_vaga: str, db: Session):
     """
@@ -334,9 +372,8 @@ def atualizar_tabelas_prospects(json_file_path: str, db: Session):
             db.add(prospect)
 
     db.commit()
-    
-    
-def listar_prospects(db: Session, offset: int = 0, limit: int = 100):
+        
+def listar_prospects(db: Session, offset: int = 0, limit: int = None):
     """
     Lista todos os prospects com paginação.
     
@@ -345,7 +382,9 @@ def listar_prospects(db: Session, offset: int = 0, limit: int = 100):
     :param limit: Número máximo de registros a serem retornados.
     :return: Lista de prospects.
     """
-    stmt = select(Prospect).offset(offset).limit(limit)
+    stmt = select(Prospect).offset(offset)
+    if limit is not None:
+        stmt = stmt.limit(limit)
     prospects = db.exec(stmt).all()
     return prospects
 
@@ -443,4 +482,44 @@ def listar_prospects_group(db: Session, offset: int = 0, limit: int = 100):
             "modalidade": "",  # Caso tenha, insira a informação ou deixe vazio
             "prospects": prospects
         })
+    return result
+
+def listar_prospects_group_eager(db: Session, offset: int = 0, limit: int = None):
+    """
+    Retorna os prospects agrupados por codigo_vaga com carregamento ansioso (eager loading).
+    Para cada grupo (vaga), busca os prospects associados com eager loading dos relacionamentos,
+    como a vaga e o candidato.
+    """
+    # Consulta para obter os grupos distintos (código e título da vaga)
+    stmt_groups = (
+        select(Prospect.codigo_vaga, Prospect.titulo_vaga)
+        .group_by(Prospect.codigo_vaga, Prospect.titulo_vaga)
+        .order_by(Prospect.codigo_vaga)
+        .offset(offset)
+    )
+    if limit is not None:
+        stmt_groups = stmt_groups.limit(limit)
+    
+    grupos = db.exec(stmt_groups).all()
+    result = []
+    
+    for grupo in grupos:
+        codigo_vaga, titulo_vaga = grupo
+        # Consulta para buscar os prospects da vaga com eager loading dos relacionamentos
+        stmt_prospects = (
+            select(Prospect)
+            .where(Prospect.codigo_vaga == codigo_vaga)
+            .options(
+                selectinload(Prospect.vaga),      # Carrega a vaga relacionada
+                selectinload(Prospect.candidato)   # Carrega o candidato relacionado
+            )
+        )
+        prospects = db.exec(stmt_prospects).all()
+        result.append({
+            "codigo_vaga": codigo_vaga,
+            "titulo_vaga": titulo_vaga,
+            "modalidade": "",  # Caso possua essa informação, adicione aqui; senão, deixado vazio
+            "prospects": prospects
+        })
+    
     return result

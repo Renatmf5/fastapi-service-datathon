@@ -8,7 +8,8 @@ from core.config import settings
 from api.utils.functions.CRUD_SystemDB import (
     salvar_vaga,
     listar_vagas,
-    listar_detalhes_vaga_por_codigo
+    listar_detalhes_vaga_por_codigo,
+    listar_vagas_eager
 )
 from core.services.fetch_S3_files import read_vagas_json_from_s3
 from fastapi import BackgroundTasks 
@@ -61,8 +62,91 @@ def atualizar_tabelas_vagas_endpoint(data: dict, background_tasks: BackgroundTas
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.get("/export-vagas", summary="Exportar Vagas para S3")
-def export_vagas(db: Session = Depends(get_system_session)):
+def do_export_vagas(db: Session):
+    try:
+        chunk_size = 1000  # ajuste conforme necessário
+        offset = 0
+        export_data = OrderedDict()
+        s3_client = boto3.client("s3")
+        
+        while True:
+            # Busca as vagas com eager loading
+            vagas = listar_vagas_eager(db, offset=offset, limit=chunk_size)
+            if not vagas:
+                break
+
+            for vaga in vagas:
+                codigo = str(vaga.codigo_vaga)
+                ordered_entry = OrderedDict()
+                
+                # Informações básicas – mantendo a ordem dos campos conforme o exemplo
+                # Definindo a ordem desejada:
+                ib = vaga.model_dump(exclude={"perfil_vaga", "beneficios"})
+                infos_order = [
+                    "data_requisicao",
+                    "limite_esperado_para_contratacao",
+                    "titulo_vaga",
+                    "vaga_sap",
+                    "cliente",
+                    "solicitante_cliente",
+                    "empresa_divisao",
+                    "requisitante",
+                    "analista_responsavel",
+                    "tipo_contratacao",
+                    "prazo_contratacao",
+                    "objetivo_vaga",
+                    "prioridade_vaga",
+                    "origem_vaga",
+                    "superior_imediato",
+                    "nome",
+                    "telefone"
+                ]
+                informacoes_basicas = OrderedDict()
+                for key in infos_order:
+                    informacoes_basicas[key] = ib.get(key) or ""
+                ordered_entry["informacoes_basicas"] = informacoes_basicas
+                
+                # Perfil da vaga – mantendo ordem dos campos
+                perfil = OrderedDict()
+                perfil_keys = [
+                    "pais", "estado", "cidade", "bairro", "regiao", "local_trabalho",
+                    "vaga_especifica_para_pcd", "faixa_etaria", "horario_trabalho",
+                    "nivel profissional", "nivel_academico", "nivel_ingles", "nivel_espanhol",
+                    "outro_idioma", "areas_atuacao", "principais_atividades",
+                    "competencia_tecnicas_e_comportamentais", "demais_observacoes",
+                    "viagens_requeridas", "equipamentos_necessarios"
+                ]
+                if vaga.perfil_vaga:
+                    pb = vaga.perfil_vaga.model_dump() if hasattr(vaga.perfil_vaga, "model_dump") else vaga.perfil_vaga
+                    for key in perfil_keys:
+                        perfil[key] = pb.get(key) or ""
+                ordered_entry["perfil_vaga"] = perfil
+                
+                # Benefícios – mantendo ordem dos campos
+                beneficios = OrderedDict()
+                beneficios_keys = ["valor_venda", "valor_compra_1", "valor_compra_2"]
+                if vaga.beneficios:
+                    bb = vaga.beneficios.model_dump() if hasattr(vaga.beneficios, "model_dump") else vaga.beneficios
+                    for key in beneficios_keys:
+                        beneficios[key] = bb.get(key) or ""
+                ordered_entry["beneficios"] = beneficios
+
+                export_data[codigo] = ordered_entry
+
+            offset += chunk_size
+        
+        json_payload = json.dumps(export_data, ensure_ascii=False, indent=4)
+        s3_key = "raw/vagas.json"
+        s3_client.put_object(
+            Bucket=settings.BUCKET_NAME,
+            Key=s3_key,
+            Body=json_payload.encode("utf-8")
+        )
+    except Exception as e:
+        print(f"Erro na exportação de vagas: {str(e)}")
+
+@router.post("/export-vagas", summary="Exportar Vagas para S3 (Background)")
+def export_vagas(background_tasks: BackgroundTasks, db: Session = Depends(get_system_session)):
     """
     Consulta toda a base de vagas, monta um JSON no formato necessário e faz o upload
     do arquivo no bucket S3 na chave "raw/vagas.json".
@@ -77,93 +161,5 @@ def export_vagas(db: Session = Depends(get_system_session)):
         "5184": { ... }
     }
     """
-    try:
-        # Recupera todas as vagas (ajuste o limite conforme o volume)
-        vagas = listar_vagas(db, offset=0, limit=10)
-        export_data = OrderedDict()
-
-        for vaga in vagas:
-            codigo = str(vaga.codigo_vaga)
-            detalhes = listar_detalhes_vaga_por_codigo(codigo, db)
-            if not detalhes:
-                continue
-
-            # Definir os dicionários ordenados conforme o formato de saída
-            # OBS: Renomeamos "data_requisicao" para "data_requicisao", conforme o exemplo
-            informacoes_basicas = OrderedDict()
-            ib = detalhes.get("infos_basicas", {})
-            informacoes_basicas["data_requicisao"] = ib.get("data_requisicao") or ""
-            informacoes_basicas["limite_esperado_para_contratacao"] = ib.get("limite_esperado_para_contratacao") or ""
-            informacoes_basicas["titulo_vaga"] = ib.get("titulo_vaga") or ""
-            informacoes_basicas["vaga_sap"] = ib.get("vaga_sap") or ""
-            informacoes_basicas["cliente"] = ib.get("cliente") or ""
-            informacoes_basicas["solicitante_cliente"] = ib.get("solicitante_cliente") or ""
-            informacoes_basicas["empresa_divisao"] = ib.get("empresa_divisao") or ""
-            informacoes_basicas["requisitante"] = ib.get("requisitante") or ""
-            informacoes_basicas["analista_responsavel"] = ib.get("analista_responsavel") or ""
-            informacoes_basicas["tipo_contratacao"] = ib.get("tipo_contratacao") or ""
-            informacoes_basicas["prazo_contratacao"] = ib.get("prazo_contratacao") or ""
-            informacoes_basicas["objetivo_vaga"] = ib.get("objetivo_vaga") or ""
-            informacoes_basicas["prioridade_vaga"] = ib.get("prioridade_vaga") or ""
-            informacoes_basicas["origem_vaga"] = ib.get("origem_vaga") or ""
-            informacoes_basicas["superior_imediato"] = ib.get("superior_imediato") or ""
-            informacoes_basicas["nome"] = ib.get("nome") or ""
-            informacoes_basicas["telefone"] = ib.get("telefone") or ""
-
-            # Perfil da vaga
-            perfil_vaga = {}
-            if detalhes.get("perfil"):
-                pb = detalhes.get("perfil")
-                perfil_vaga = {
-                    "pais": pb.get("pais") or "",
-                    "estado": pb.get("estado") or "",
-                    "cidade": pb.get("cidade") or "",
-                    "bairro": pb.get("bairro") or "",
-                    "regiao": pb.get("regiao") or "",
-                    "local_trabalho": pb.get("local_trabalho") or "",
-                    "vaga_especifica_para_pcd": pb.get("vaga_especifica_para_pcd") or "",
-                    "faixa_etaria": pb.get("faixa_etaria") or "",
-                    "horario_trabalho": pb.get("horario_trabalho") or "",
-                    "nivel profissional": pb.get("nivel_profissional") or "",
-                    "nivel_academico": pb.get("nivel_academico") or "",
-                    "nivel_ingles": pb.get("nivel_ingles") or "",
-                    "nivel_espanhol": pb.get("nivel_espanhol") or "",
-                    "outro_idioma": pb.get("outro_idioma") or "",
-                    "areas_atuacao": pb.get("areas_atuacao") or "",
-                    "principais_atividades": pb.get("principais_atividades") or "",
-                    "competencia_tecnicas_e_comportamentais": pb.get("competencia_tecnicas_e_comportamentais") or "",
-                    "demais_observacoes": pb.get("demais_observacoes") or "",
-                    "viagens_requeridas": pb.get("viagens_requeridas") or "",
-                    "equipamentos_necessarios": pb.get("equipamentos_necessarios") or ""
-                }
-            
-            # Benefícios da vaga
-            beneficios = {}
-            if detalhes.get("beneficios"):
-                bb = detalhes.get("beneficios")
-                beneficios = {
-                    "valor_venda": bb.get("valor_venda") or "",
-                    "valor_compra_1": bb.get("valor_compra_1") or "",
-                    "valor_compra_2": bb.get("valor_compra_2") or ""
-                }
-
-            export_data[codigo] = OrderedDict({
-                "informacoes_basicas": informacoes_basicas,
-                "perfil_vaga": perfil_vaga,
-                "beneficios": beneficios
-            })
-        
-        json_payload = json.dumps(export_data, ensure_ascii=False, indent=4)
-        
-        # Envia o JSON para o S3 utilizando o bucket configurado
-        s3_client = boto3.client("s3")
-        s3_key = "raw/vagas.json"
-        s3_client.put_object(
-            Bucket=settings.BUCKET_NAME,
-            Key=s3_key,
-            Body=json_payload.encode("utf-8")
-        )
-        
-        return {"message": "Exportação de vagas concluída com sucesso."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro na exportação de vagas: {str(e)}")
+    background_tasks.add_task(do_export_vagas, db)
+    return {"message": "Tarefa de exportação de vagas iniciada em background."}
