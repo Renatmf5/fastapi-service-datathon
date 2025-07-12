@@ -305,9 +305,175 @@ Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Dep
 
 ---
 
-- **/prospects** (`prospects.py`):  
+## Endpoints de Prospects
+
+### **/prospects** (`prospects.py`):  
   _Descrição_: Endpoints para operações relacionadas aos prospects, representando os potenciais candidatos que podem ser indicados para oportunidades.  
   _Comentário_: Permite a listagem, cadastro e atualização de prospects, auxiliando na triagem de candidatos para futuras oportunidades.
+
+- **POST /prospects/add-candidate**: Adiciona um candidato à vaga (prospect).  
+  - **Descrição**:  
+    Este endpoint cria um novo prospect associando um candidato a uma vaga. Se não existir nenhum prospect para a vaga, um novo registro é criado; se já existir uma combinação de `codigo_vaga` e `codigo_candidato`, uma exceção é lançada.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Exemplo de Corpo da Requisição**:
+    ```json
+    {
+      "codigo_vaga": 101,
+      "titulo_vaga": "Backend Developer",
+      "nome": "João Silva",
+      "codigo_candidato": 123,
+      "situacao_candidato": "Em análise",
+      "data_candidatura": "2025-07-12",
+      "comentario": "Candidato com experiência em Python",
+      "recrutador": "Maria Oliveira"
+    }
+    ```
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "message": "Prospect criado com sucesso.",
+        "data": {
+          "id": 1,
+          "codigo_vaga": 101,
+          "titulo_vaga": "Backend Developer",
+          "nome": "João Silva",
+          "codigo_candidato": 123,
+          "situacao_candidato": "Em análise",
+          "data_candidatura": "2025-07-12",
+          "ultima_atualizacao": "12-07-2025",
+          "comentario": "Candidato com experiência em Python",
+          "recrutador": "Maria Oliveira"
+        }
+      }
+      ```
+    - **400 Bad Request**: Caso haja problemas na validação ou se já existir um prospect com os mesmos dados.
+  
+- **PUT /prospects/update-candidate**: Atualiza informações do candidato no prospect.  
+  - **Descrição**:  
+    Atualiza campos específicos de um prospect (como a situação do candidato e comentários) e registra a data da última atualização.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Exemplo de Corpo da Requisição**:
+    ```json
+    {
+      "codigo_vaga": 101,
+      "codigo_candidato": 123,
+      "situacao_candidato": "Aprovado",
+      "comentario": "Candidato aprovado para a próxima etapa."
+    }
+    ```
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "message": "Prospect atualizado com sucesso.",
+        "data": {
+          "id": 1,
+          "codigo_vaga": 101,
+          "titulo_vaga": "Backend Developer",
+          "nome": "João Silva",
+          "codigo_candidato": 123,
+          "situacao_candidato": "Aprovado",
+          "data_candidatura": "2025-07-12",
+          "ultima_atualizacao": "12-07-2025",
+          "comentario": "Candidato aprovado para a próxima etapa.",
+          "recrutador": "Maria Oliveira"
+        }
+      }
+      ```
+    - **400 Bad Request**: Se o prospect não for encontrado ou se os dados fornecidos forem inválidos.
+  
+- **GET /prospects/list**: Lista todos os prospects com suporte à paginação.  
+  - **Descrição**:  
+    Retorna uma lista simplificada dos prospects cadastrados, permitindo a paginação através dos parâmetros `offset` e `limit`.
+  - **Query Parameters**:
+    - **offset** (opcional): Posição inicial dos registros (padrão: 0).
+    - **limit** (opcional): Número máximo de registros a serem retornados (padrão: 100).
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "total": 50,
+        "offset": 0,
+        "limit": 100,
+        "data": [
+          { "id": 1, "codigo_vaga": 101, "nome": "João Silva", "...": "outros campos" },
+          { "id": 2, "codigo_vaga": 102, "nome": "Maria Souza", "...": "outros campos" }
+        ]
+      }
+      ```
+    - **500 Internal Server Error**: Se ocorrer um erro ao recuperar a lista de prospects.
+  
+- **GET /prospects/grouped-list**: Lista prospects agrupados por vaga.  
+  - **Descrição**:  
+    Retorna os prospects agrupados por `codigo_vaga` e `titulo_vaga`, facilitando a visualização dos candidatos por vaga.
+  - **Query Parameters**:
+    - **offset** (opcional): Posição inicial dos grupos (padrão: 0).
+    - **limit** (opcional): Número máximo de grupos a serem retornados (padrão: 100).
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "total_grupos": 5,
+        "offset": 0,
+        "limit": 100,
+        "data": [
+          {
+            "codigo_vaga": 101,
+            "titulo_vaga": "Backend Developer",
+            "prospects": [
+              { "id": 1, "nome": "João Silva", "...": "outros campos" },
+              { "id": 3, "nome": "Carlos Lima", "...": "outros campos" }
+            ]
+          },
+          {
+            "codigo_vaga": 102,
+            "titulo_vaga": "Frontend Developer",
+            "prospects": [
+              { "id": 2, "nome": "Maria Souza", "...": "outros campos" }
+            ]
+          }
+        ]
+      }
+      ```
+    - **500 Internal Server Error**: Em caso de erro ao agrupar os prospects.
+  
+- **POST /prospects/update-tables**: Atualiza as tabelas de prospects usando um arquivo JSON armazenado no S3.  
+  - **Descrição**:  
+    Aciona uma tarefa em background para ler um arquivo JSON do S3 e atualizar completamente os dados dos prospects.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Exemplo de Corpo da Requisição**:
+    ```json
+    {
+      "file_key": "caminho/do/arquivo_prospects.json"
+    }
+    ```
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      { "message": "Tarefa de atualização iniciada em background." }
+      ```
+    - **400 Bad Request**: Se o campo `file_key` estiver ausente.
+    - **500 Internal Server Error**: Em caso de erro ao iniciar a tarefa.
+  
+- **POST /prospects/export-prospects**: Exporta os dados de prospects para um arquivo JSON e faz o upload para o S3 de forma assíncrona.  
+  - **Descrição**:  
+    Consulta toda a base de prospects, monta um JSON estruturado com os dados agrupados por vaga e faz o upload para um bucket do S3, tudo de forma assíncrona.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      { "message": "Tarefa de exportação de prospects iniciada em background." }
+      ```
+    - **500 Internal Server Error**: Em caso de erro ao iniciar a tarefa de exportação.
 
 - **/usuarios** (`usuarios.py`):  
   _Descrição_: Endpoints relativos à autenticação e gerenciamento de usuários que têm acesso à API.  
