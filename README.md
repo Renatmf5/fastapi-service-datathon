@@ -479,9 +479,162 @@ Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Dep
   _Descrição_: Endpoints relativos à autenticação e gerenciamento de usuários que têm acesso à API.  
   _Comentário_: Essencial para operações de login, criação e gerenciamento dos dados dos usuários (por exemplo, administradores ou usuários finais).
 
-- **/vagas** (`vagas.py`):  
+## Endpoints de Vagas
+
+### **/vagas** (`vagas.py`):  
   _Descrição_: Endpoints para manipulação e consulta de vagas, incluindo dados sobre informações básicas, perfil e benefícios da posição.  
   _Comentário_: Permite o cadastramento de vagas e a atualização das informações relativas às oportunidades de emprego.
+
+- **POST /vagas/create**: Cria uma nova vaga no sistema.  
+  - **Descrição**:  
+    Este endpoint insere os dados de uma vaga no sistema. Se a vaga já existir (baseado no `codigo_vaga`), os dados serão atualizados.  
+    O objeto JSON de entrada deve conter:
+    - **infos_basicas**: Informações essenciais da vaga (por exemplo, título, cliente, tipo de contratação, etc.).
+    - **perfil_vaga** (opcional): Detalhes sobre o perfil da vaga, como local de trabalho, requisitos, nível profissional e acadêmico, etc.
+    - **beneficios** (opcional): Informações sobre benefícios oferecidos, como valores de venda e compra.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Exemplo de Corpo da Requisição**:
+    ```json
+    {
+      "infos_basicas": {
+        "data_requisicao": "2025-07-12",
+        "limite_esperado_para_contratacao": "5",
+        "titulo_vaga": "Backend Developer",
+        "vaga_sap": "XYZ123",
+        "cliente": "Cliente A",
+        "solicitante_cliente": "Solicitante A",
+        "empresa_divisao": "TI",
+        "requisitante": "Requisitante A",
+        "analista_responsavel": "Analista X",
+        "tipo_contratacao": "CLT",
+        "prazo_contratacao": "30 dias",
+        "objetivo_vaga": "Desenvolver APIs REST",
+        "prioridade_vaga": "Alta",
+        "origem_vaga": "Interna",
+        "superior_imediato": "Gestor Y",
+        "nome": "Vaga Backend Developer",
+        "telefone": "(11) 99999-9999"
+      },
+      "perfil_vaga": {
+        "pais": "Brasil",
+        "estado": "SP",
+        "cidade": "São Paulo",
+        "bairro": "Centro",
+        "regiao": "Sudeste",
+        "local_trabalho": "Remoto",
+        "vaga_especifica_para_pcd": "Não",
+        "faixa_etaria": "25-35",
+        "horario_trabalho": "09:00-18:00",
+        "nivel_profissional": "Pleno",
+        "nivel_academico": "Ensino Superior Completo",
+        "nivel_ingles": "Avançado",
+        "nivel_espanhol": "Intermediário",
+        "outro_idioma": "",
+        "areas_atuacao": "Desenvolvimento",
+        "principais_atividades": "Desenvolvimento e manutenção de APIs",
+        "competencia_tecnicas_e_comportamentais": "Trabalho em equipe, proatividade",
+        "demais_observacoes": "Experiência com Python",
+        "viagens_requeridas": "Não",
+        "equipamentos_necessarios": "Laptop próprio"
+      },
+      "beneficios": {
+        "valor_venda": "1000",
+        "valor_compra_1": "800",
+        "valor_compra_2": "750"
+      }
+    }
+    ```
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "message": "Vaga criada com sucesso!",
+        "codigo_vaga": 101
+      }
+      ```
+    - **400 Bad Request**: Em caso de dados inválidos.
+    - **500 Internal Server Error**: Se ocorrer um erro durante a operação.
+
+- **GET /vagas/list**: Lista as vagas com suporte à paginação.  
+  - **Descrição**:  
+    Retorna uma lista simplificada de vagas cadastradas. Permite o uso de parâmetros de query para definição de `offset` e `limit`, facilitando a paginação dos registros.
+  - **Query Parameters**:
+    - **offset** (opcional): Posição inicial dos registros (padrão: 0).
+    - **limit** (opcional): Número máximo de registros a retornar (padrão: 100).
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "total": 50,
+        "offset": 0,
+        "limit": 100,
+        "data": [
+          { "codigo_vaga": 101, "titulo_vaga": "Backend Developer", "...": "outros campos" },
+          { "codigo_vaga": 102, "titulo_vaga": "Frontend Developer", "...": "outros campos" }
+        ]
+      }
+      ```
+    - **500 Internal Server Error**: Se ocorrer algum erro durante a consulta.
+
+- **GET /vagas/details/{codigo_vaga}**: Retorna os detalhes completos de uma determinada vaga.  
+  - **Descrição**:  
+    Busca e retorna todas as informações de uma vaga identificada pelo `codigo_vaga`. São retornados:
+    - Dados das informações básicas.
+    - Detalhes do perfil da vaga.
+    - Informações sobre benefícios.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Parâmetros de URL**:
+    - **codigo_vaga**: Identificador único da vaga.
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "data": {
+          "infos_basicas": { "...": "dados básicos da vaga" },
+          "perfil_vaga": { "...": "dados do perfil da vaga" },
+          "beneficios": { "...": "dados dos benefícios" }
+        }
+      }
+      ```
+    - **404 Not Found**: Caso a vaga não seja encontrada.
+    - **500 Internal Server Error**: Em caso de erro na consulta.
+
+- **POST /vagas/update-tables**: Atualiza as tabelas de vagas a partir de um arquivo JSON armazenado no S3.  
+  - **Descrição**:  
+    Este endpoint aciona uma tarefa em background que lê um arquivo JSON armazenado no S3 e atualiza todas as tabelas relacionadas às vagas.  
+    O arquivo JSON deve conter os dados estruturados de forma que each registro possa ser identificado e convertido adequadamente para os modelos da vaga.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Exemplo de Corpo da Requisição**:
+    ```json
+    {
+      "file_key": "caminho/do/arquivo_vagas.json"
+    }
+    ```
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      { "message": "Tarefa de atualização iniciada em background." }
+      ```
+    - **400 Bad Request**: Se o campo `file_key` for omitido.
+    - **500 Internal Server Error**: Se ocorrer erro na inicialização da tarefa.
+
+- **POST /vagas/export-vagas**: Exporta os dados de vagas para um arquivo JSON e realiza o upload para o S3 de forma assíncrona.  
+  - **Descrição**:  
+    Consulta toda a base de vagas, monta um JSON estruturado com os dados das vagas (incluindo informações básicas, perfil e benefícios) e faz o upload para um bucket S3 na chave `"raw/vagas.json"`.  
+    Todo o processo ocorre em background para não bloquear a resposta da API.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      { "message": "Tarefa de exportação de vagas iniciada em background." }
+      ```
+    - **500 Internal Server Error**: Em caso de erro ao iniciar a tarefa de exportação.
 
 ## Operações com Banco de Dados
 
