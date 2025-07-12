@@ -1,9 +1,10 @@
 import pandas as pd
+import os
 from sentence_transformers import SentenceTransformer
 from annoy import AnnoyIndex
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from core.services.fetch_S3_files import busca_modelo_pkl_classificacao, busca_modelo_recomendacao, busca_recommendation_pairs
+from core.services.fetch_S3_files import busca_modelo_pkl_classificacao, busca_modelo_recomendacao, busca_recommendation_pairs, busca_drift_report
 
 router = APIRouter()
 
@@ -113,3 +114,21 @@ async def inferir_recomendacao(payload: InputDataRecomendacaoModel):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/driftReport")
+async def inferir_drift_report():
+    try:
+        # Busca o caminho do relatório de drift
+        drift_report_path = busca_drift_report()
+        
+        if not drift_report_path or not os.path.exists(drift_report_path):
+            raise HTTPException(status_code=404, detail="Drift report not found")
+        
+        with open(drift_report_path, "r", encoding="utf-8") as file:
+            content = file.read()
+            
+        return {"drift_report": content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    

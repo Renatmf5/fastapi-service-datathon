@@ -328,3 +328,37 @@ def busca_recommendation_pairs() -> str:
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+    
+# Função que busca pagina HTML sempre no diretorio https://decision-data-lake.s3.us-east-1.amazonaws.com/drift_reports/drift_report.html
+def busca_drift_report() -> str:
+    """
+    Busca o arquivo drift_report.html do S3, sempre atualizando o cache.
+    Retorna o caminho local do arquivo.
+    """
+    try:
+        file_key = "drift_reports/drift_report.html"
+        local_file_path = os.path.join(cache_dir, "drift_report.html")
+        cache_metadata_path = os.path.join(cache_dir, "drift_report_metadata.txt")
+        
+        # Verifica se o arquivo está em cache e se está atualizado
+        if os.path.exists(local_file_path) and os.path.exists(cache_metadata_path):
+            with open(cache_metadata_path, "r") as meta_file:
+                cached_last_modified = datetime.fromisoformat(meta_file.read().strip())
+            s3_last_modified = get_s3_file_last_modified(key=file_key)
+            if cached_last_modified >= s3_last_modified:
+                return local_file_path  # Retorna o caminho do arquivo em cache
+        
+        # Baixa o arquivo do S3
+        s3_client.download_file(Bucket=bucket_name, Key=file_key, Filename=local_file_path)
+        
+        # Atualiza os metadados do cache
+        s3_last_modified = get_s3_file_last_modified(key=file_key)
+        with open(cache_metadata_path, "w") as meta_file:
+            meta_file.write(s3_last_modified.isoformat())
+        
+        # retorna o arquivo html para a api
+        return local_file_path
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
