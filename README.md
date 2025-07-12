@@ -15,6 +15,7 @@ Este é um projeto desenvolvido para a disciplina de Pós-Graduação, utilizand
 
 A estrutura de pastas do projeto está organizada da seguinte forma:
 
+```plaintext
 ├── appspec.yml                      # Configuração do CodeDeploy para deployment na AWS ECS  
 ├── Dockerfile                       # Arquivo para construção da imagem Docker  
 ├── main.py                          # Arquivo principal que instancia a aplicação FastAPI e inicializa os bancos de dados  
@@ -52,45 +53,7 @@ A estrutura de pastas do projeto está organizada da seguinte forma:
 │   └── stop_application.sh         # Script para interromper a aplicação  
 └── cache/                          
     └── ...                         # Arquivos de cache, metadados e índices
-
-
-├── appspec.yml                      # Configuração do CodeDeploy para deployment na AWS ECS  
-├── Dockerfile                       # Arquivo para construção da imagem Docker  
-├── main.py                          # Arquivo principal que instancia a aplicação FastAPI e inicializa os bancos de dados  
-├── requirements.txt                 # Dependências do projeto  
-├── api/                             # Endpoints e utilitários da API  
-│   ├── v1/                        
-│   │   ├── api.py                  # Agrega os endpoints e configura os routers  
-│   │   └── endpoints/              
-│   │       ├── candidatos.py       # Endpoints relacionados a candidatos  
-│   │       ├── inferencias.py      # Endpoints para geração e consulta de inferências  
-│   │       ├── prospects.py        # Endpoints voltados aos prospects  
-│   │       ├── usuarios.py         # Endpoints para operações com usuários  
-│   │       └── vagas.py            # Endpoints para manipulação de vagas  
-│   └── utils/                     
-│       └── functions/             
-│           └── CRUD_SystemDB.py    # Funções para operações CRUD no banco do sistema  
-├── core/                           
-│   ├── config.py                   # Configurações e variáveis de ambiente  
-│   ├── database.py                 # Configuração dos bancos de dados: auth e system  
-│   └── auth.py                     # Autenticação e configurações relacionadas  
-├── models/                         
-│   ├── candidato_model.py          
-│   ├── prospect_model.py           
-│   ├── usuario_model.py            
-│   └── vagas_model.py              
-├── schemas/                        
-│   ├── candidato_schema.py         
-│   ├── prospect_schema.py          
-│   ├── usuario_schema.py           
-│   └── vagas_schema.py             
-├── scripts/                        
-│   ├── before_install.sh           # Script executado antes da instalação  
-│   ├── after_install.sh            # Script executado após a instalação  
-│   ├── start_application.sh        # Script para iniciar a aplicação  
-│   └── stop_application.sh         # Script para interromper a aplicação  
-└── cache/                          
-    └── ...                         # Arquivos de cache, metadados
+```
 
 ## Endpoints
 
@@ -99,6 +62,131 @@ A API possui os seguintes endpoints (localizados em `api/v1/endpoints/`):
 - **/candidatos** (`candidatos.py`):  
   _Descrição_: Endpoints que lidam com as informações de candidatos (dados básicos, pessoais, profissionais, formação, idiomas e currículos).  
   _Comentário_: Este conjunto de endpoints é usado para cadastrar, atualizar ou consultar informações dos candidatos que estão participando dos processos de seleção.
+  
+  - **POST /candidatos/create**: Cria um novo candidato no sistema.
+  - **Descrição**: Este endpoint insere os dados de um candidato. Caso o candidato já exista (baseado no código profissional), os dados serão atualizados. É esperado um objeto JSON estruturado contendo informações divididas em:
+    - **infos_basicas**: Dados principais do candidato (ex.: nome, cpf, código_profissional, etc.).
+    - **informacoes_pessoais** (opcional): Dados pessoais, como endereço, telefone, etc.
+    - **informacoes_profissionais** (opcional): Histórico e dados profissionais.
+    - **formacao_e_idiomas** (opcional): Dados de formação acadêmica e idiomas.
+    - **cv_pt** (opcional): Currículo em português.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Exemplo de Corpo da Requisição**:
+    ```json
+    {
+      "infos_basicas": {
+        "codigo_profissional": 123,
+        "nome": "João Silva",
+        "cpf": "11122233344",
+        "...": "outros dados"
+      },
+      "informacoes_pessoais": {
+        "endereco": "Rua A, 123",
+        "telefone": "11999999999"
+      },
+      "informacoes_profissionais": {
+        "empresa": "Empresa XPTO",
+        "cargo": "Desenvolvedor"
+      },
+      "formacao_e_idiomas": {
+        "formacao": "Graduação em Ciência da Computação",
+        "idiomas": ["Português", "Inglês"]
+      },
+      "cv_pt": "Link ou texto do currículo em português"
+    }
+    ```
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "message": "Candidato inserido com sucesso!",
+        "codigo_candidato": 123
+      }
+      ```
+    - **400 Bad Request**: Em caso de dados inválidos ou ausência de campos obrigatórios.
+    - **500 Internal Server Error**: Em caso de erro na operação de inserção/atualização.
+
+- **GET /candidatos/list**: Lista os candidatos com suporte à paginação.
+  - **Descrição**: Este endpoint retorna uma lista simplificada de candidatos. Permite o uso de parâmetros de query para definir `offset` e `limit`, possibilitando a paginação dos resultados.
+  - **Query Parameters**:
+    - **offset** (opcional): Posição inicial dos registros (padrão: 0).
+    - **limit** (opcional): Número máximo de registros a serem retornados (padrão: 100).
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "total": 50,
+        "offset": 0,
+        "limit": 100,
+        "data": [
+          { "codigo_profissional": 123, "nome": "João Silva", "...": "outros campos" },
+          { "codigo_profissional": 124, "nome": "Maria Souza", "...": "outros campos" }
+        ]
+      }
+      ```
+    - **500 Internal Server Error**: Em caso de falha ao recuperar os dados.
+
+- **GET /candidatos/details/{codigo_profissional}**: Retorna os detalhes completos de um candidato.
+  - **Descrição**: Busca e retorna todas as informações do candidato identificado por `codigo_profissional`. São retornados os dados de:
+    - Informações básicas
+    - Informações pessoais
+    - Informações profissionais
+    - Formação e idiomas
+    - Currículos  
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Parâmetros de URL**:
+    - **codigo_profissional**: Código identificador do candidato.
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "infos_basicas": { "...": "dados básicos" },
+        "informacoes_pessoais": { "...": "dados pessoais" },
+        "informacoes_profissionais": { "...": "dados profissionais" },
+        "formacao_e_idiomas": { "...": "dados de formação e idiomas" },
+        "curriculos": { "...": "dados do currículo" }
+      }
+      ```
+    - **400 Bad Request**: Se o código informado for inválido.
+    - **404 Not Found**: Se nenhum candidato for encontrado com o código informado.
+    - **500 Internal Server Error**: Em caso de erro na consulta.
+
+- **POST /candidatos/update-tables**: Atualiza as tabelas de candidatos a partir de um arquivo JSON armazenado no S3.
+  - **Descrição**: Este endpoint aciona uma tarefa em background para ler um arquivo JSON do S3 e atualizar completamente as tabelas de candidatos. O JSON deve conter os dados completos de cada candidato.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Exemplo de Corpo da Requisição**:
+    ```json
+    {
+      "file_key": "caminho/do/arquivo.json"
+    }
+    ```
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      { "message": "Tarefa de atualização iniciada em background." }
+      ```
+    - **400 Bad Request**: Se o campo `file_key` estiver ausente.
+    - **500 Internal Server Error**: Em caso de erro na inicialização da tarefa.
+
+- **POST /candidatos/export-applicants**: Exporta os dados de candidatos para um arquivo JSON e realiza o upload para o S3, de forma assíncrona.
+  - **Descrição**: Este endpoint consulta toda a base de candidatos, monta um JSON no formato necessário para exportação e envia o arquivo para um bucket S3. Todo o processo ocorre em background.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      { "message": "Tarefa de exportação de candidatos iniciada em background." }
+      ```
+    - **500 Internal Server Error**: Em caso de erro ao iniciar a tarefa de exportação.
+
+---
+
+Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Depends(get_system_session)`) para garantir a consistência e segurança na manipulação dos dados. As operações são tratadas com atenção aos possíveis erros, retornando status adequados e mensagens informativas para facilitar o diagnóstico e uso da API.
 
 - **/inferencias** (`inferencias.py`):  
   _Descrição_: Endpoints voltados para a geração e consulta de inferências a partir dos dados disponíveis.  
