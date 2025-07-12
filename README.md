@@ -15,26 +15,26 @@ Este é um projeto desenvolvido para a disciplina de Pós-Graduação, utilizand
 
 A estrutura de pastas do projeto está organizada da seguinte forma:
 
-├── appspec.yml                      # Configuração do CodeDeploy para deployment na AWS ECS  
-├── Dockerfile                       # Arquivo para construção da imagem Docker  
-├── main.py                          # Arquivo principal que instancia a aplicação FastAPI e inicializa os bancos de dados  
-├── requirements.txt                 # Dependências do projeto  
-├── api/                             # Endpoints e utilitários da API  
+├── appspec.yml                      # Configuração do CodeDeploy para deployment na AWS ECS
+├── Dockerfile                       # Arquivo para construção da imagem Docker
+├── main.py                          # Arquivo principal que instancia a aplicação FastAPI e inicializa os bancos de dados
+├── requirements.txt                 # Dependências do projeto
+├── api/                             # Endpoints e utilitários da API
 │   ├── v1/                        
-│   │   ├── api.py                  # Agrega os endpoints e configura os routers  
+│   │   ├── api.py                  # Agrega os endpoints e configura os routers
 │   │   └── endpoints/              
-│   │       ├── candidatos.py       # Endpoints relacionados a candidatos  
-│   │       ├── inferencias.py      # Endpoints para geração e consulta de inferências  
-│   │       ├── prospects.py        # Endpoints voltados aos prospects  
-│   │       ├── usuarios.py         # Endpoints para operações com usuários  
-│   │       └── vagas.py            # Endpoints para manipulação de vagas  
+│   │       ├── candidatos.py       # Endpoints relacionados a candidatos
+│   │       ├── inferencias.py      # Endpoints para geração e consulta de inferências
+│   │       ├── prospects.py        # Endpoints voltados aos prospects
+│   │       ├── usuarios.py         # Endpoints para operações com usuários
+│   │       └── vagas.py            # Endpoints para manipulação de vagas
 │   └── utils/                     
 │       └── functions/             
-│           └── CRUD_SystemDB.py    # Funções para operações CRUD no banco do sistema  
+│           └── CRUD_SystemDB.py    # Funções para operações CRUD no banco do sistema
 ├── core/                           
-│   ├── config.py                   # Configurações e variáveis de ambiente  
-│   ├── database.py                 # Configuração dos bancos de dados: auth e system  
-│   └── auth.py                     # Autenticação e configurações relacionadas  
+│   ├── config.py                   # Configurações e variáveis de ambiente
+│   ├── database.py                 # Configuração dos bancos de dados: auth e system
+│   └── auth.py                     # Autenticação e configurações relacionadas
 ├── models/                         
 │   ├── candidato_model.py          
 │   ├── prospect_model.py           
@@ -46,10 +46,10 @@ A estrutura de pastas do projeto está organizada da seguinte forma:
 │   ├── usuario_schema.py           
 │   └── vagas_schema.py             
 ├── scripts/                        
-│   ├── before_install.sh           # Script executado antes da instalação  
-│   ├── after_install.sh            # Script executado após a instalação  
-│   ├── start_application.sh        # Script para iniciar a aplicação  
-│   └── stop_application.sh         # Script para interromper a aplicação  
+│   ├── before_install.sh           # Script executado antes da instalação
+│   ├── after_install.sh            # Script executado após a instalação
+│   ├── start_application.sh        # Script para iniciar a aplicação
+│   └── stop_application.sh         # Script para interromper a aplicação
 └── cache/                          
     └── ...                         # Arquivos de cache, metadados e índices
 
