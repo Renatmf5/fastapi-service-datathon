@@ -88,4 +88,23 @@ Para clonar e executar o projeto localmente, siga os passos abaixo:
   ```bash
   python3 -m venv venv
   source venv/bin/activate
-  ```
+    
+3. **Instalar as dependências**:
+  ```bash
+  pip install -r requirements.txt
+
+4. **Execução da aplicação**
+  - Para ambiente de produção:
+  ```bash
+  python main.py
+
+  A aplicação rodará na porta 80.
+
+ - Para desenvolvimento (com reload automático):
+  ```bash
+  export ENV=development
+  python main.py
+
+  A aplicação será executada na porta 8000.
+
+
