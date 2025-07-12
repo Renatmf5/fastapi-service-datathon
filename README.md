@@ -13,9 +13,45 @@ Este é um projeto desenvolvido para a disciplina de Pós-Graduação, utilizand
 
 ## Estrutura do Projeto
 
-A estrutura de pastas está organizada da seguinte forma:
-. ├── appspec.yml # Configuração do CodeDeploy para deploy na AWS ECS ├── Dockerfile # Arquivo para construção da imagem Docker ├── main.py # Arquivo principal que instancia a aplicação FastAPI e inicializa os bancos de dados ├── requirements.txt # Dependências do projeto ├── api/ │ ├── v1/ │ │ ├── api.py # Agrega os endpoints da API e configura os routers │ │ └── endpoints/ # Pasta contendo os endpoints │ │ ├── candidatos.py # Endpoints relacionados a operações com candidatos │ │ ├── inferencias.py # Endpoints para geração e consulta de inferências │ │ ├── prospects.py # Endpoints voltados aos prospects │ │ ├── usuarios.py # Endpoints responsáveis por operações com usuários │ │ └── vagas.py # Endpoints para manipulação de vagas │ └── utils/ │ └── functions/ │ └── CRUD_SystemDB.py # Funções para operações CRUD no banco do sistema ├── core/ │ ├── config.py # Configurações e variáveis de ambiente │ ├── database.py # Configuração dos bancos de dados: auth e system │ └── auth.py # Autenticação e outras configurações relacionadas ├── models/ # Modelos dos dados para cada recurso │ ├── candidato_model.py │ ├── prospect_model.py │ ├── usuario_model.py │ └── vagas_model.py ├── schemas/ # Schemas referentes à validação e serialização dos dados │ ├── candidato_schema.py │ ├── prospect_schema.py │ ├── usuario_schema.py │ └── vagas_schema.py ├── scripts/ # Scripts utilizados pelo CodeDeploy │ ├── before_install.sh │ ├── after_install.sh │ ├── start_application.sh │ └── stop_application.sh └── cache/ # Arquivos gerados de cache (índices, metadados e dados serializados)
+A estrutura de pastas do projeto está organizada da seguinte forma:
 
+├── appspec.yml                      # Configuração do CodeDeploy para deployment na AWS ECS  
+├── Dockerfile                       # Arquivo para construção da imagem Docker  
+├── main.py                          # Arquivo principal que instancia a aplicação FastAPI e inicializa os bancos de dados  
+├── requirements.txt                 # Dependências do projeto  
+├── api/                             # Endpoints e utilitários da API  
+│   ├── v1/                        
+│   │   ├── api.py                  # Agrega os endpoints e configura os routers  
+│   │   └── endpoints/              
+│   │       ├── candidatos.py       # Endpoints relacionados a candidatos  
+│   │       ├── inferencias.py      # Endpoints para geração e consulta de inferências  
+│   │       ├── prospects.py        # Endpoints voltados aos prospects  
+│   │       ├── usuarios.py         # Endpoints para operações com usuários  
+│   │       └── vagas.py            # Endpoints para manipulação de vagas  
+│   └── utils/                     
+│       └── functions/             
+│           └── CRUD_SystemDB.py    # Funções para operações CRUD no banco do sistema  
+├── core/                           
+│   ├── config.py                   # Configurações e variáveis de ambiente  
+│   ├── database.py                 # Configuração dos bancos de dados: auth e system  
+│   └── auth.py                     # Autenticação e configurações relacionadas  
+├── models/                         
+│   ├── candidato_model.py          
+│   ├── prospect_model.py           
+│   ├── usuario_model.py            
+│   └── vagas_model.py              
+├── schemas/                        
+│   ├── candidato_schema.py         
+│   ├── prospect_schema.py          
+│   ├── usuario_schema.py           
+│   └── vagas_schema.py             
+├── scripts/                        
+│   ├── before_install.sh           # Script executado antes da instalação  
+│   ├── after_install.sh            # Script executado após a instalação  
+│   ├── start_application.sh        # Script para iniciar a aplicação  
+│   └── stop_application.sh         # Script para interromper a aplicação  
+└── cache/                          
+    └── ...                         # Arquivos de cache, metadados e índices
 
 
 ## Endpoints
@@ -96,17 +132,18 @@ Para clonar e executar o projeto localmente, siga os passos abaixo:
   ```
 
 4. **Execução da aplicação**
-  - Para ambiente de produção:
+  - Para ambiente de produção a aplicação rodará na porta 80.:
   ```bash
   python main.py
   ```
-  A aplicação rodará na porta 80.
-
- - Para desenvolvimento (com reload automático):
+ - Para desenvolvimento (com reload automático) a aplicação será executada na porta 8000.:
   ```bash
   export ENV=development
   python main.py
   ```
-  A aplicação será executada na porta 8000.
+  
+## Considerações Finais
+Esta documentação detalha a estrutura, os endpoints e aspectos importantes do projeto. O objetivo é fornecer um panorama completo e profissional, facilitando a compreensão tanto para a entrega acadêmica quanto para eventuais colaboradores que queiram utilizar ou contribuir com o projeto.
 
+Caso haja dúvidas ou necessidade de melhorias, colabore através de issues ou pull requests.
 
