@@ -4,8 +4,16 @@ Este é um projeto desenvolvido para a disciplina de Pós-Graduação, utilizand
 
 ## Índice
 
+## Índice
+
 - [Estrutura do Projeto](#estrutura-do-projeto)
-- [Endpoints](#endpoints)
+- [Sumário de Endpoints](#sumário-de-endpoints)
+- [Endpoints Detalhados](#endpoints-detalhados)
+  - [Candidatos](#endpoints-de-candidatos)
+  - [Inferências](#endpoints-de-inferências)
+  - [Prospects](#endpoints-de-prospects)
+  - [Vagas](#endpoints-de-vagas)
+  - [Usuários](#endpoints-de-usuários)
 - [Operações com Banco de Dados](#operações-com-banco-de-dados)
 - [Deploy via AWS ECS](#deploy-via-aws-ecs)
 - [Instalação e Inicialização](#instalação-e-inicialização)
@@ -63,7 +71,7 @@ Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Dep
 
 ## Endpoints de Candidatos
 
-**/candidatos** (`candidatos.py`):  
+### **/candidatos** (`candidatos.py`):  
   _Descrição_: Endpoints que lidam com as informações de candidatos (dados básicos, pessoais, profissionais, formação, idiomas e currículos).  
   _Comentário_: Este conjunto de endpoints é usado para cadastrar, atualizar ou consultar informações dos candidatos que estão participando dos processos de seleção.
 
@@ -190,9 +198,9 @@ Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Dep
 
 ---
 
-### Endpoints de Inferências
+## Endpoints de Inferências
 
-**/inferencias** (`inferencias.py`):  
+### **/inferencias** (`inferencias.py`):  
   _Descrição_: Endpoints voltados para a geração e consulta de inferências a partir dos dados disponíveis.  
   _Comentário_: São utilizados para executar análises ou modelos preditivos que ajudem a identificar padrões ou tendências entre os dados dos candidatos e vagas.
 
@@ -475,9 +483,7 @@ Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Dep
       ```
     - **500 Internal Server Error**: Em caso de erro ao iniciar a tarefa de exportação.
 
-- **/usuarios** (`usuarios.py`):  
-  _Descrição_: Endpoints relativos à autenticação e gerenciamento de usuários que têm acesso à API.  
-  _Comentário_: Essencial para operações de login, criação e gerenciamento dos dados dos usuários (por exemplo, administradores ou usuários finais).
+---
 
 ## Endpoints de Vagas
 
@@ -635,6 +641,120 @@ Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Dep
       { "message": "Tarefa de exportação de vagas iniciada em background." }
       ```
     - **500 Internal Server Error**: Em caso de erro ao iniciar a tarefa de exportação.
+
+---
+
+## Endpoints de Usuários
+
+### **/usuarios** (`usuarios.py`):  
+  _Descrição_: Endpoints relativos à autenticação e gerenciamento de usuários que têm acesso à API.  
+  _Comentário_: Essencial para operações de login, criação e gerenciamento dos dados dos usuários (por exemplo, administradores ou usuários finais).
+
+- **GET /usuarios/logado**: Retorna as informações do usuário atualmente autenticado.  
+  - **Descrição**:  
+    Este endpoint verifica o token de autenticação enviado no cabeçalho da requisição e retorna os dados básicos do usuário autenticado.  
+  - **Cabeçalho**:
+    - **Authorization**: Bearer <token>
+    - **Content-Type**: application/json
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "username": "usuario_exemplo",
+        "perfil": "admin"
+      }
+      ```
+    - **401 Unauthorized**: Caso o token seja inválido ou o usuário não esteja autenticado.
+
+- **POST /usuarios/login**: Realiza o login do usuário e retorna um token de acesso.  
+  - **Descrição**:  
+    Este endpoint recebe os dados de login (username e password) usando o padrão OAuth2PasswordRequestForm e, se as credenciais forem válidas, gera e retorna um token JWT para autenticação das próximas requisições.  
+  - **Cabeçalho**:
+    - **Content-Type**: application/x-www-form-urlencoded
+  - **Exemplo de Corpo (form-data)**:
+    ```
+    username=usuario_exemplo
+    password=senha123
+    ```
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      ```
+    - **401 Unauthorized**: Se as credenciais forem inválidas.
+
+- **POST /usuarios/signup**: Cria um novo usuário no sistema.  
+  - **Descrição**:  
+    Este endpoint cadastra um novo usuário, recebendo um payload JSON com as informações necessárias (username, password e perfil).  
+    A senha é hashada antes de ser armazenada e, em caso de tentativa de cadastro de um usuário já existente, um erro apropriado é retornado.  
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Exemplo de Corpo da Requisição**:
+    ```json
+    {
+      "username": "novo_usuario",
+      "password": "senha_supersecreta",
+      "perfil": "usuario"
+    }
+    ```
+  - **Resposta**:
+    - **201 Created**:  
+      ```json
+      {
+        "username": "novo_usuario",
+        "perfil": "usuario"
+      }
+      ```
+    - **400 Bad Request**: Se o usuário já existir.
+
+- **GET /usuarios/list**: Lista todos os usuários cadastrados.  
+  - **Descrição**:  
+    Este endpoint retorna uma lista de usuários do sistema com os dados básicos de cada um.  
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      [
+        {
+          "username": "usuario1",
+          "perfil": "admin"
+        },
+        {
+          "username": "usuario2",
+          "perfil": "usuario"
+        }
+      ]
+      ```
+    - **500 Internal Server Error**: Em caso de erro na recuperação dos dados.
+
+- **PUT /usuarios/{usuario_id}**: Atualiza os dados de um usuário específico.  
+  - **Descrição**:  
+    Este endpoint permite atualizar parcialmente os dados de um usuário identificado pelo `usuario_id`.  
+    Se o campo `password` for atualizado, a nova senha é hashada antes de ser salva.  
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Parâmetros de URL**:
+    - **usuario_id**: Identificador único do usuário.
+  - **Exemplo de Corpo da Requisição**:
+    ```json
+    {
+      "username": "usuario_atualizado",
+      "password": "nova_senha",
+      "perfil": "admin"
+    }
+    ```
+  - **Resposta**:
+    - **202 Accepted**:  
+      ```json
+      {
+        "username": "usuario_atualizado",
+        "perfil": "admin"
+      }
+      ```
+    - **404 Not Found**: Se o usuário com o `usuario_id` informado não existir.
+    - **400 Bad Request**: Em caso de dados inválidos.
+
 
 ## Operações com Banco de Dados
 
