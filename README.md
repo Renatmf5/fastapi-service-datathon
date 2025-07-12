@@ -55,15 +55,19 @@ A estrutura de pastas do projeto está organizada da seguinte forma:
     └── ...                         # Arquivos de cache, metadados e índices
 ```
 
-## Endpoints
+### Endpoints
 
 A API possui os seguintes endpoints (localizados em `api/v1/endpoints/`):
 
-- **/candidatos** (`candidatos.py`):  
+Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Depends(get_system_session)`) para garantir a consistência e segurança na manipulação dos dados. As operações são tratadas com atenção aos possíveis erros, retornando status adequados e mensagens informativas para facilitar o diagnóstico e uso da API.
+
+## Endpoints de Candidatos
+
+# **/candidatos** (`candidatos.py`):  
   _Descrição_: Endpoints que lidam com as informações de candidatos (dados básicos, pessoais, profissionais, formação, idiomas e currículos).  
   _Comentário_: Este conjunto de endpoints é usado para cadastrar, atualizar ou consultar informações dos candidatos que estão participando dos processos de seleção.
-  
-  - **POST /candidatos/create**: Cria um novo candidato no sistema.
+
+- **POST /candidatos/create**: Cria um novo candidato no sistema.
   - **Descrição**: Este endpoint insere os dados de um candidato. Caso o candidato já exista (baseado no código profissional), os dados serão atualizados. É esperado um objeto JSON estruturado contendo informações divididas em:
     - **infos_basicas**: Dados principais do candidato (ex.: nome, cpf, código_profissional, etc.).
     - **informacoes_pessoais** (opcional): Dados pessoais, como endereço, telefone, etc.
@@ -186,11 +190,120 @@ A API possui os seguintes endpoints (localizados em `api/v1/endpoints/`):
 
 ---
 
-Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Depends(get_system_session)`) para garantir a consistência e segurança na manipulação dos dados. As operações são tratadas com atenção aos possíveis erros, retornando status adequados e mensagens informativas para facilitar o diagnóstico e uso da API.
+### Endpoints de Inferências
 
-- **/inferencias** (`inferencias.py`):  
+# **/inferencias** (`inferencias.py`):  
   _Descrição_: Endpoints voltados para a geração e consulta de inferências a partir dos dados disponíveis.  
   _Comentário_: São utilizados para executar análises ou modelos preditivos que ajudem a identificar padrões ou tendências entre os dados dos candidatos e vagas.
+
+- **POST /inferencias/matchModel/predict**: Calcula a probabilidade de match entre o candidato e a vaga.  
+  - **Descrição**:  
+    Este endpoint utiliza um modelo de classificação para prever a probabilidade de um candidato ser compatível com uma vaga.  
+    O modelo é carregado a partir de um arquivo .pkl (armazenado no S3 ou em cache) e o payload é convertido para um DataFrame do pandas antes da predição.  
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Exemplo de Corpo da Requisição**:
+    ```json
+    {
+      "sexo": "M",
+      "estado_civil": "Solteiro",
+      "pcd": "Não",
+      "vaga_especifica_para_pcd": "Não",
+      "pais_vaga": "Brasil",
+      "nivel_academico": "Ensino Superior Completo",
+      "tipo_contratacao": "CLT",
+      "cidade": "São Paulo",
+      "cidade_vaga": "São Paulo",
+      "nivel_profissional": "Pleno",
+      "nivel_profissional_vaga": "Pleno",
+      "ingles": "Avançado",
+      "espanhol": "Intermediário",
+      "outros_idiomas": "Nenhum",
+      "nivel_ingles_vaga": "Avançado",
+      "nivel_espanhol_vaga": "Intermediário",
+      "titulo_profissional": "Desenvolvedor Backend",
+      "titulo_vaga": "Backend Developer",
+      "conhecimentos_tecnicos": "Python, FastAPI, SQLAlchemy",
+      "certificacoes": "AWS Certified",
+      "outras_certificacoes": "Scrum",
+      "area_atuacao": "TI",
+      "areas_atuacao_vaga": "Desenvolvimento",
+      "competencia_tecnicas_e_comportamentais": "Trabalho em equipe, responsabilidade",
+      "cv_candidato": "https://link-para-cv.com"
+    }
+    ```
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "match_probability": 85.3
+      }
+      ```
+      _Comentário_: O valor retornado representa a probabilidade (em porcentagem) de que o candidato seja considerado compatível com a vaga.
+    - **500 Internal Server Error**: Em caso de erro no processamento ou na carga do modelo.
+
+- **POST /inferencias/recommendationModel/predict**: Gera recomendações de vagas para o candidato.  
+  - **Descrição**:  
+    Este endpoint utiliza um modelo de recomendação para sugerir vagas que se encaixem no perfil do candidato.  
+    Ele incorpora uma técnica de embedding utilizando o SentenceTransformer e utiliza um índice Annoy para encontrar os candidatos mais próximos, retornando os dados relevantes das vagas recomendadas.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Exemplo de Corpo da Requisição**:
+    ```json
+    {
+      "titulo_profissional": "Desenvolvedor Backend",
+      "conhecimentos_tecnicos": "Python, FastAPI, SQLAlchemy",
+      "certificacoes": "AWS Certified",
+      "outras_certificacoes": "Scrum",
+      "cidade": "São Paulo",
+      "ingles": "Avançado",
+      "espanhol": "Básico",
+      "outros_idiomas": "Nenhum",
+      "pcd": "Não",
+      "cv_candidato": "https://link-para-cv.com"
+    }
+    ```
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "data": [
+          {
+            "codigo_vaga": 101,
+            "titulo_vaga": "Backend Developer",
+            "competencia_tecnicas_e_comportamentais": "Python, SQL, Liderança",
+            "areas_atuacao_vaga": "Desenvolvimento"
+          },
+          {
+            "codigo_vaga": 102,
+            "titulo_vaga": "API Developer",
+            "competencia_tecnicas_e_comportamentais": "FastAPI, Docker",
+            "areas_atuacao_vaga": "Tecnologia"
+          }
+        ]
+      }
+      ```
+      _Comentário_: O array retornado contém as vagas recomendadas com os principais atributos que ajudam na avaliação da recomendação.
+    - **500 Internal Server Error**: Em caso de falhas ao carregar os modelos ou erros no processo de recomendação.
+
+- **GET /inferencias/driftReport**: Retorna o relatório de drift do modelo.  
+  - **Descrição**:  
+    Este endpoint busca o caminho para o relatório de drift (indicativo de mudanças no desempenho/qualidade dos modelos) e retorna seu conteúdo.  
+    Caso o relatório não seja encontrado, é retornado um erro 404.
+  - **Cabeçalho**:
+    - **Content-Type**: application/json
+  - **Resposta**:
+    - **200 OK**:  
+      ```json
+      {
+        "drift_report": "Conteúdo do relatório de drift..."
+      }
+      ```
+      _Comentário_: O conteúdo retornado é uma string contendo o relatório completo, que pode ser utilizado para análise e monitoramento dos modelos.
+    - **404 Not Found**: Se o relatório não for encontrado.
+    - **500 Internal Server Error**: Em caso de erro ao acessar ou ler o relatório.
+
+---
 
 - **/prospects** (`prospects.py`):  
   _Descrição_: Endpoints para operações relacionadas aos prospects, representando os potenciais candidatos que podem ser indicados para oportunidades.  
