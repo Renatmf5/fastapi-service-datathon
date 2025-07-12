@@ -63,7 +63,7 @@ Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Dep
 
 ## Endpoints de Candidatos
 
-# **/candidatos** (`candidatos.py`):  
+**/candidatos** (`candidatos.py`):  
   _Descrição_: Endpoints que lidam com as informações de candidatos (dados básicos, pessoais, profissionais, formação, idiomas e currículos).  
   _Comentário_: Este conjunto de endpoints é usado para cadastrar, atualizar ou consultar informações dos candidatos que estão participando dos processos de seleção.
 
@@ -192,7 +192,7 @@ Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Dep
 
 ### Endpoints de Inferências
 
-# **/inferencias** (`inferencias.py`):  
+**/inferencias** (`inferencias.py`):  
   _Descrição_: Endpoints voltados para a geração e consulta de inferências a partir dos dados disponíveis.  
   _Comentário_: São utilizados para executar análises ou modelos preditivos que ajudem a identificar padrões ou tendências entre os dados dos candidatos e vagas.
 
