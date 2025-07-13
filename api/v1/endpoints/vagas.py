@@ -50,15 +50,15 @@ def detalhes_vaga(codigo_vaga: str, db: Session = Depends(get_system_session)):
 
 @router.post("/update-tables", summary="Atualizar Tabelas de Vagas")
 def atualizar_tabelas_vagas_endpoint(data: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_system_session)):
+    file_key = data.get("file_key")
+    if not file_key:
+        raise HTTPException(status_code=400, detail="O campo 'file_key' é obrigatório.")
     try:
-        file_key = data.get("file_key")
-        if not file_key:
-            raise HTTPException(status_code=400, detail="O campo 'file_key' é obrigatório.")
-        
         # Adiciona a tarefa em background para ler o JSON e atualizar o BD
         background_tasks.add_task(read_vagas_json_from_s3, file_key)
-        
         return {"message": "Tarefa de atualização iniciada em background."}
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     

@@ -14,6 +14,7 @@ Este é um projeto desenvolvido para a disciplina de Pós-Graduação, utilizand
   - [Prospects](#endpoints-de-prospects)
   - [Vagas](#endpoints-de-vagas)
   - [Usuários](#endpoints-de-usuários)
+- [Testes Unitários](#testes-unitários)
 - [Operações com Banco de Dados](#operações-com-banco-de-dados)
 - [Deploy via AWS ECS](#deploy-via-aws-ecs)
 - [Instalação e Inicialização](#instalação-e-inicialização)
@@ -754,6 +755,29 @@ Cada um desses endpoints utiliza a sessão do banco de dados (`db: Session = Dep
       ```
     - **404 Not Found**: Se o usuário com o `usuario_id` informado não existir.
     - **400 Bad Request**: Em caso de dados inválidos.
+
+
+## Testes Unitários
+
+Foram desenvolvidos testes unitários para garantir a integridade dos principais componentes do sistema. Utilizamos o framework [pytest](https://docs.pytest.org/) pela sua simplicidade e eficácia. A abordagem inclui:
+
+- **Organização dos testes:** Os testes estão organizados em arquivos dedicados, alinhados com as funcionalidades testadas.
+- **Ferramentas de apoio:** 
+  - [pytest](https://docs.pytest.org/) para execução e gerenciamento dos testes.
+  - [coverage.py](https://coverage.readthedocs.io/) para análise de cobertura de código.
+
+- Foram criados testes unitários para validar os principais comportamentos da API. A estrutura dos testes está organizada na pasta `tests/`, onde cada módulo de teste contém testes para um domínio da aplicação, por exemplo:
+
+- `tests/test_candidatos.py`: Testes para endpoints relacionados a candidatos.
+- `tests/test_vagas.py`: Testes para endpoints relacionados a vagas.
+- `tests/test_prospects.py`: Testes para endpoints relacionados a prospects.
+- `tests/test_inferencias.py`: Testes para endpoints de inferências (match, recomendação e drift report).
+
+- **Como executar:**  
+  Para executar os testes, utilize o pytest. No terminal, certifique-se de que o ambiente virtual esteja ativado e execute:
+
+  ```bash
+  pytest --maxfail=1 --disable-warnings -q
 
 
 ## Operações com Banco de Dados

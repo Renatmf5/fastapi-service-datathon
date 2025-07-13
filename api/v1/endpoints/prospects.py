@@ -72,17 +72,19 @@ async def listar_grouped(offset: int = 0, limit: int = 100, db: Session = Depend
 
 @router.post("/update-tables", summary="Atualizar Tabelas de Prospects")
 async def atualizar_tabelas(data: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_system_session)):
+    # Ler o arquivo JSON do S3
+    file_key = data.get("file_key")
+    if not file_key:
+            raise HTTPException(status_code=400, detail="O campo 'file_key' é obrigatório.")
     try:
-        # Ler o arquivo JSON do S3
-        file_key = data.get("file_key")
-        if not file_key:
-                raise HTTPException(status_code=400, detail="O campo 'file_key' é obrigatório.")
         # Adiciona a tarefa em background para ler o JSON e atualizar o BD
         background_tasks.add_task(read_prospects_json_from_s3, file_key)
 
         return {"message": "Tarefa de atualização iniciada em background."}
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))    
+        raise HTTPException(status_code=500, detail=str(e))
 
 def do_export_prospects(db: Session):
     try:
