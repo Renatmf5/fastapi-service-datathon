@@ -59,7 +59,12 @@ A estrutura de pastas do projeto está organizada da seguinte forma:
 │   ├── before_install.sh           # Script executado antes da instalação  
 │   ├── after_install.sh            # Script executado após a instalação  
 │   ├── start_application.sh        # Script para iniciar a aplicação  
-│   └── stop_application.sh         # Script para interromper a aplicação  
+│   └── stop_application.sh         # Script para interromper a aplicação
+├── tests/                        
+│   ├── test_candidatos.sh           # Testes para endpoints relacionados a candidatos. 
+│   ├── test_inferencias.sh          # Testes para endpoints de inferências (match, recomendação e drift report).
+│   ├── test_prospects.sh            # Testes para endpoints relacionados a prospects. 
+│   └── test_vagas.sh                # Testes para endpoints relacionados a vagas.
 └── cache/                          
     └── ...                         # Arquivos de cache, metadados e índices
 ```
