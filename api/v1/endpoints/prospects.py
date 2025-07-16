@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from core.database import get_system_session
 from core.config import settings
-from api.utils.functions.CRUD_SystemDB import listar_prospects, add_candidate_to_prospect, update_candidate_in_prospect, listar_prospects_group, listar_prospects_group_eager
+from api.utils.functions.CRUD_SystemDB import listar_prospects, add_candidate_to_prospect, update_candidate_in_prospect, listar_prospects_group, listar_prospects_group_eager, busca_prospect_por_codigo_vaga
 from core.services.fetch_S3_files import read_prospects_json_from_s3
 from pydantic import BaseModel
 from fastapi import BackgroundTasks
@@ -66,6 +66,27 @@ async def listar_grouped(offset: int = 0, limit: int = 100, db: Session = Depend
             grupo["prospects"] = [p.model_dump() for p in grupo["prospects"]]
             grupos_convertidos.append(grupo)
         return {"total_grupos": len(grupos_convertidos), "offset": offset, "limit": limit, "data": grupos_convertidos}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/{codigo_vaga}", summary="Buscar prospect por código da vaga")
+async def get_prospect_by_vaga(codigo_vaga: int, db: Session = Depends(get_system_session)):
+    try:
+        # Consulta prospects filtrando pelo codigo_vaga
+        prospects = busca_prospect_por_codigo_vaga(codigo_vaga, db)
+        if not prospects:
+            raise HTTPException(status_code=404, detail="Prospect não encontrado para a vaga informada.")     
+        # Utiliza o título da vaga do primeiro prospect; 
+        # se necessário, pode adaptar para buscar de outra fonte
+        titulo_vaga = prospects[0].titulo_vaga if hasattr(prospects[0], "titulo_vaga") else ""
+        
+        result = {
+            "codigo_vaga": codigo_vaga,
+            "titulo_vaga": titulo_vaga,
+            "modalidade": "",  # Adapte caso tenha essa informação
+            "prospects": [p.model_dump() for p in prospects]
+        }
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

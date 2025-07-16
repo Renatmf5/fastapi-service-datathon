@@ -15,16 +15,17 @@ class InputDataMatchModel(BaseModel):
     vaga_especifica_para_pcd: str
     pais_vaga: str
     nivel_academico: str
+    nivel_academico_vaga: str = ""
     tipo_contratacao: str
     cidade: str
     cidade_vaga: str
     nivel_profissional: str
     nivel_profissional_vaga: str
     ingles: str
-    espanhol: str
-    outros_idiomas: str
     nivel_ingles_vaga: str
+    espanhol: str
     nivel_espanhol_vaga: str
+    outros_idiomas: str
     titulo_profissional: str
     titulo_vaga: str
     conhecimentos_tecnicos: str
@@ -34,6 +35,7 @@ class InputDataMatchModel(BaseModel):
     areas_atuacao_vaga: str
     competencia_tecnicas_e_comportamentais: str
     cv_candidato: str
+    principais_atividades: str = ""
 
 class InputDataRecomendacaoModel(BaseModel):
     titulo_profissional: str
@@ -53,14 +55,33 @@ async def inferir(payload: InputDataMatchModel):
         # Carrega o modelo (usa a função que busca o arquivo .pkl no S3 ou cache)
         model = busca_modelo_pkl_classificacao()
         
-        # Converte o payload para um DataFrame do pandas para manter as colunas nomeadas
-        input_data = pd.DataFrame([payload.model_dump()])
+        # Converte o payload para DataFrame
+        data = payload.model_dump()
+        
+        # Cria a feature combinada, se necessário, conforme feito no treinamento
+        data['combined_keywords'] = (data.get('conhecimentos_tecnicos', '') + " " + data.get('principais_atividades', '')).strip()
+        
+        # Lista de colunas esperadas (mesmo nome usado no treinamento)
+        expected_columns = [
+            "sexo", "estado_civil", "pcd", "vaga_especifica_para_pcd", "pais_vaga",
+            "nivel_academico","nivel_academico_vaga", "tipo_contratacao", "cidade", "cidade_vaga",
+            "nivel_profissional", "nivel_profissional_vaga", "ingles", "espanhol",
+            "outros_idiomas", "nivel_ingles_vaga", "nivel_espanhol_vaga",
+            "titulo_profissional", "titulo_vaga", "conhecimentos_tecnicos", 
+            "principais_atividades", "certificacoes", "outras_certificacoes", 
+            "area_atuacao", "areas_atuacao_vaga", "competencia_tecnicas_e_comportamentais", 
+            "cv_candidato", "combined_keywords"
+        ]
+        
+        # Converte para DataFrame e reordena colunas, preenchendo com string vazia se faltar algum campo
+        input_data = pd.DataFrame([data])
+        input_data = input_data.reindex(columns=expected_columns, fill_value="")
         
         # Realiza a predição de probabilidade
         prediction = model.predict_proba(input_data)
         
-        # Acessa somente a segunda posição
-        match_probability = round(float(prediction[0][1]),3) * 100
+        # Retorna somente a probabilidade da classe positiva
+        match_probability = round(float(prediction[0][1]), 3) * 100
         
         return {"match_probability": match_probability}
     except Exception as e:

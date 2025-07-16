@@ -388,6 +388,18 @@ def listar_prospects(db: Session, offset: int = 0, limit: int = None):
     prospects = db.exec(stmt).all()
     return prospects
 
+def busca_prospect_por_codigo_vaga(codigo_vaga: int, db: Session):
+    """
+    Busca prospects associados a um código de vaga específico.
+    
+    :param codigo_vaga: Código da vaga para filtrar os prospects.
+    :param db: Sessão do banco de dados.
+    :return: Lista de prospects associados à vaga.
+    """
+    stmt = select(Prospect).where(Prospect.codigo_vaga == codigo_vaga)
+    prospects = db.exec(stmt).all()
+    return prospects
+
 def add_candidate_to_prospect(data: dict, db: Session):
     """
     Adiciona um candidato a um prospect. 
